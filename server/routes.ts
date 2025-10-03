@@ -4,6 +4,13 @@ import { storage } from "./storage";
 import { insertTripSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { nanoid } from "nanoid";
+
+// Helper to generate random invitation code
+function generateInvitationCode(): string {
+  // Generate a random 12-character code (uppercase letters and numbers)
+  return nanoid(12).toUpperCase();
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Replit Auth
@@ -23,6 +30,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Invitation signup (public) - create user with invitation code
+  app.post("/api/invitations/signup", async (req: any, res) => {
+    try {
+      const signupSchema = z.object({
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Invalid email"),
+        invitationCode: z.string().min(1, "Invitation code is required"),
+      });
+
+      const { name, email, invitationCode } = signupSchema.parse(req.body);
+
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      // Verify invitation code
+      const invitation = await storage.getInvitationCodeByCode(invitationCode);
+      if (!invitation) {
+        return res.status(400).json({ message: "Invalid invitation code" });
+      }
+
+      // Check if code is already used
+      if (invitation.usedAt) {
+        return res.status(400).json({ message: "Invitation code has already been used" });
+      }
+
+      // Check if code is revoked
+      if (invitation.revokedAt) {
+        return res.status(400).json({ message: "Invitation code has been revoked" });
+      }
+
+      // Split name into first and last name
+      const nameParts = name.trim().split(/\s+/);
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      // Create user with invitation auth provider
+      const newUser = await storage.createUser({
+        email,
+        firstName,
+        lastName,
+        authProvider: "invitation",
+      });
+
+      // Mark invitation code as used
+      await storage.markInvitationCodeAsUsed(invitation.id, newUser.id);
+
+      // Log the user in by creating a session
+      req.login({ claims: { sub: newUser.id, email: newUser.email } }, (err: any) => {
+        if (err) {
+          console.error("Login error:", err);
+          return res.status(500).json({ message: "Failed to create session" });
+        }
+        res.status(201).json(newUser);
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.errors,
+        });
+      }
+      console.error("Error creating user via invitation:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Admin: List all users (protected)
+  app.get("/api/admin/users", isAuthenticated, async (_req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Admin: List all invitation codes (protected)
+  app.get("/api/admin/invitations", isAuthenticated, async (_req, res) => {
+    try {
+      const invitations = await storage.getAllInvitationCodes();
+      res.json(invitations);
+    } catch (error) {
+      console.error("Error fetching invitation codes:", error);
+      res.status(500).json({ message: "Failed to fetch invitation codes" });
+    }
+  });
+
+  // Admin: Create new invitation code (protected)
+  app.post("/api/admin/invitations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const code = generateInvitationCode();
+
+      const invitation = await storage.createInvitationCode({
+        code,
+        createdByUserId: userId,
+      });
+
+      res.status(201).json(invitation);
+    } catch (error) {
+      console.error("Error creating invitation code:", error);
+      res.status(500).json({ message: "Failed to create invitation code" });
+    }
+  });
+
+  // Admin: Revoke invitation code (protected)
+  app.delete("/api/admin/invitations/:id", isAuthenticated, async (req, res) => {
+    try {
+      const invitation = await storage.revokeInvitationCode(req.params.id);
+      if (!invitation) {
+        return res.status(404).json({ message: "Invitation code not found" });
+      }
+      res.json({ message: "Invitation code revoked successfully", invitation });
+    } catch (error) {
+      console.error("Error revoking invitation code:", error);
+      res.status(500).json({ message: "Failed to revoke invitation code" });
     }
   });
 
