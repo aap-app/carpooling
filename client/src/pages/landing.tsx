@@ -35,10 +35,8 @@ export default function Landing() {
 
   const signupMutation = useMutation({
     mutationFn: async (data: InvitationSignupForm) => {
-      return apiRequest("/api/invitations/signup", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      const response = await apiRequest("POST", "/api/invitations/signup", data);
+      return response.json();
     },
     onSuccess: () => {
       toast({
@@ -49,9 +47,32 @@ export default function Landing() {
       setTimeout(() => window.location.reload(), 1000);
     },
     onError: (error: any) => {
+      console.error("Signup error:", error);
+      
+      // Extract error message from response
+      let errorMessage = "Failed to create account. Please check your invitation code.";
+      
+      if (error?.message) {
+        console.log("Error message:", error.message);
+        // Error message format: "400: {json}" or "400: plain text"
+        try {
+          const match = error.message.match(/\d+:\s*(.+)/);
+          if (match) {
+            const jsonText = match[1];
+            const errorData = JSON.parse(jsonText);
+            errorMessage = errorData.message || errorMessage;
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, use the whole error message
+          console.log("Failed to parse error, using raw message");
+          errorMessage = error.message;
+        }
+      }
+      
+      console.log("Showing toast with message:", errorMessage);
       toast({
         title: "Signup failed",
-        description: error.message || "Failed to create account. Please check your invitation code.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
