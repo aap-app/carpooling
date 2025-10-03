@@ -78,9 +78,41 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
+    const claims = tokens.claims();
+    if (!claims) {
+      return verified(new Error("No claims in token"), false);
+    }
+    const email = claims["email"] as string;
+    
+    // Check OAuth restrictions
+    const restrictionsSetting = await storage.getSetting("oauth_restrictions");
+    if (restrictionsSetting?.value) {
+      const restrictions = restrictionsSetting.value as {
+        allowedDomains: string[];
+        allowedGitHubOrgs: string[];
+      };
+      
+      // If allowed domains are configured, check email domain
+      if (restrictions.allowedDomains && restrictions.allowedDomains.length > 0) {
+        const emailDomain = email.split("@")[1]?.toLowerCase();
+        const isAllowedDomain = restrictions.allowedDomains.some(
+          domain => emailDomain === domain.toLowerCase()
+        );
+        
+        if (!isAllowedDomain) {
+          return verified(new Error("Your email domain is not authorized to access this application"), false);
+        }
+      }
+      
+      // TODO: GitHub org validation
+      // This would require checking if the user is a member of allowed GitHub orgs
+      // This is complex because it requires GitHub API access and the provider info from claims
+      // For now, domain validation applies to all providers
+    }
+    
     const user = {};
     updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
+    await upsertUser(claims);
     verified(null, user);
   };
 

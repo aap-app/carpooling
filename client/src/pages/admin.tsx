@@ -4,12 +4,14 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Key, Database, Copy, Trash2, AlertTriangle, Download, Upload, CheckCircle, XCircle } from "lucide-react";
+import { Users, Key, Database, Copy, Trash2, AlertTriangle, Download, Upload, CheckCircle, XCircle, Settings, Plus, X as XIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { User, InvitationCode, Trip } from "@shared/schema";
 
@@ -18,6 +20,13 @@ export default function Admin() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parsedTrips, setParsedTrips] = useState<any[]>([]);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isCreateInviteDialogOpen, setIsCreateInviteDialogOpen] = useState(false);
+  const [inviteMaxUses, setInviteMaxUses] = useState(1);
+  const [inviteExpiresInHours, setInviteExpiresInHours] = useState(24);
+  const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
+  const [allowedGitHubOrgs, setAllowedGitHubOrgs] = useState<string[]>([]);
+  const [newDomain, setNewDomain] = useState("");
+  const [newOrg, setNewOrg] = useState("");
 
   // Fetch all users
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, index, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -38,6 +38,9 @@ export const invitationCodes = pgTable("invitation_codes", {
   revokedAt: timestamp("revoked_at"),
   usedByUserId: varchar("used_by_user_id"),
   usedAt: timestamp("used_at"),
+  maxUses: integer("max_uses").notNull().default(1),
+  currentUses: integer("current_uses").notNull().default(0),
+  expiresAt: timestamp("expires_at"),
 });
 
 export const insertInvitationCodeSchema = createInsertSchema(invitationCodes).omit({
@@ -46,10 +49,27 @@ export const insertInvitationCodeSchema = createInsertSchema(invitationCodes).om
   revokedAt: true,
   usedByUserId: true,
   usedAt: true,
+  currentUses: true,
 });
 
 export type InsertInvitationCode = z.infer<typeof insertInvitationCodeSchema>;
 export type InvitationCode = typeof invitationCodes.$inferSelect;
+
+// Settings table for app configuration
+export const settings = pgTable("settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: varchar("key").notNull().unique(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSettingSchema = createInsertSchema(settings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertSetting = z.infer<typeof insertSettingSchema>;
+export type Setting = typeof settings.$inferSelect;
 
 export const trips = pgTable("trips", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -1,7 +1,7 @@
-import { type Trip, type InsertTrip, trips, type User, type UpsertUser, users, type InvitationCode, type InsertInvitationCode, invitationCodes } from "@shared/schema";
+import { type Trip, type InsertTrip, trips, type User, type UpsertUser, users, type InvitationCode, type InsertInvitationCode, invitationCodes, type Setting, type InsertSetting, settings } from "@shared/schema";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, asc, isNull, desc } from "drizzle-orm";
+import { eq, asc, isNull, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User methods for Replit Auth and invitation users
@@ -25,7 +25,11 @@ export interface IStorage {
   getAllInvitationCodes(): Promise<InvitationCode[]>;
   getInvitationCodeByCode(code: string): Promise<InvitationCode | undefined>;
   revokeInvitationCode(id: string): Promise<InvitationCode | undefined>;
-  markInvitationCodeAsUsed(id: string, usedByUserId: string): Promise<InvitationCode | undefined>;
+  incrementInvitationCodeUsage(id: string, usedByUserId: string): Promise<InvitationCode | undefined>;
+  
+  // Settings methods
+  getSetting(key: string): Promise<Setting | undefined>;
+  setSetting(key: string, value: any): Promise<Setting>;
 }
 
 export class DbStorage implements IStorage {
@@ -282,20 +286,71 @@ export class DbStorage implements IStorage {
     }
   }
 
-  async markInvitationCodeAsUsed(id: string, usedByUserId: string): Promise<InvitationCode | undefined> {
+  async incrementInvitationCodeUsage(id: string, usedByUserId: string): Promise<InvitationCode | undefined> {
     try {
+      // Increment currentUses and set usedAt/usedByUserId for first use
+      const code = await this.db
+        .select()
+        .from(invitationCodes)
+        .where(eq(invitationCodes.id, id))
+        .limit(1);
+      
+      if (!code[0]) return undefined;
+      
+      const isFirstUse = code[0].currentUses === 0;
+      
       const result = await this.db
         .update(invitationCodes)
         .set({ 
-          usedByUserId,
-          usedAt: new Date()
+          currentUses: sql`${invitationCodes.currentUses} + 1`,
+          ...(isFirstUse ? {
+            usedByUserId,
+            usedAt: new Date()
+          } : {})
         })
         .where(eq(invitationCodes.id, id))
         .returning();
       
       return result[0];
     } catch (error) {
-      console.error("markInvitationCodeAsUsed error:", error);
+      console.error("incrementInvitationCodeUsage error:", error);
+      throw error;
+    }
+  }
+
+  // Settings methods
+  async getSetting(key: string): Promise<Setting | undefined> {
+    try {
+      const result = await this.db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, key))
+        .limit(1);
+      
+      return result[0];
+    } catch (error) {
+      console.error("getSetting error:", error);
+      throw error;
+    }
+  }
+
+  async setSetting(key: string, value: any): Promise<Setting> {
+    try {
+      const result = await this.db
+        .insert(settings)
+        .values({ key, value })
+        .onConflictDoUpdate({
+          target: settings.key,
+          set: {
+            value,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("setSetting error:", error);
       throw error;
     }
   }

@@ -56,14 +56,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid invitation code" });
       }
 
-      // Check if code is already used
-      if (invitation.usedAt) {
-        return res.status(400).json({ message: "Invitation code has already been used" });
-      }
-
       // Check if code is revoked
       if (invitation.revokedAt) {
         return res.status(400).json({ message: "Invitation code has been revoked" });
+      }
+
+      // Check if code is expired
+      if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "Invitation code has expired" });
+      }
+
+      // Check if code has reached max uses
+      if (invitation.currentUses >= invitation.maxUses) {
+        return res.status(400).json({ message: "Invitation code has reached maximum uses" });
       }
 
       // Split name into first and last name
@@ -79,8 +84,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         authProvider: "invitation",
       });
 
-      // Mark invitation code as used
-      await storage.markInvitationCodeAsUsed(invitation.id, newUser.id);
+      // Increment invitation code usage
+      await storage.incrementInvitationCodeUsage(invitation.id, newUser.id);
 
       // Log the user in by creating a session
       // Set expires_at to a far future date (invitation users don't have token expiry)
@@ -135,13 +140,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const code = generateInvitationCode();
 
+      // Parse request body with defaults
+      const requestSchema = z.object({
+        maxUses: z.number().int().positive().optional().default(1),
+        expiresInHours: z.number().positive().optional().default(24),
+      });
+
+      const { maxUses, expiresInHours } = requestSchema.parse(req.body);
+
+      // Calculate expiration date
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + expiresInHours);
+
       const invitation = await storage.createInvitationCode({
         code,
         createdByUserId: userId,
+        maxUses,
+        expiresAt,
       });
 
       res.status(201).json(invitation);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.errors,
+        });
+      }
       console.error("Error creating invitation code:", error);
       res.status(500).json({ message: "Failed to create invitation code" });
     }
@@ -158,6 +183,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error revoking invitation code:", error);
       res.status(500).json({ message: "Failed to revoke invitation code" });
+    }
+  });
+
+  // Admin: Get OAuth settings (protected)
+  app.get("/api/admin/settings/oauth", isAuthenticated, async (_req, res) => {
+    try {
+      const setting = await storage.getSetting("oauth_restrictions");
+      const restrictions = setting?.value || {
+        allowedDomains: [],
+        allowedGitHubOrgs: [],
+      };
+      res.json(restrictions);
+    } catch (error) {
+      console.error("Error fetching OAuth settings:", error);
+      res.status(500).json({ message: "Failed to fetch OAuth settings" });
+    }
+  });
+
+  // Admin: Update OAuth settings (protected)
+  app.put("/api/admin/settings/oauth", isAuthenticated, async (req, res) => {
+    try {
+      const settingsSchema = z.object({
+        allowedDomains: z.array(z.string()).optional().default([]),
+        allowedGitHubOrgs: z.array(z.string()).optional().default([]),
+      });
+
+      const restrictions = settingsSchema.parse(req.body);
+      
+      const setting = await storage.setSetting("oauth_restrictions", restrictions);
+      res.json(setting.value);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.errors,
+        });
+      }
+      console.error("Error updating OAuth settings:", error);
+      res.status(500).json({ message: "Failed to update OAuth settings" });
     }
   });
 
