@@ -105,14 +105,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const trips = await storage.getAllTrips();
       
-      // Create CSV content
+      // Helper function to escape CSV values per RFC 4180
+      const escapeCSV = (value: string): string => {
+        // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+        if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      };
+      
+      // Create CSV content with proper escaping
       const headers = ["Name", "Flight Date", "Flight Time", "Flight Number", "Car Status"];
       const rows = trips.map(trip => [
-        trip.name,
-        trip.flightDate,
-        trip.flightTime,
-        trip.flightNumber,
-        trip.carStatus
+        escapeCSV(trip.name),
+        escapeCSV(trip.flightDate),
+        escapeCSV(trip.flightTime),
+        escapeCSV(trip.flightNumber),
+        escapeCSV(trip.carStatus)
       ]);
       
       const csvContent = [
@@ -138,24 +147,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid data: expected array of trips" });
       }
 
-      // Validate all trips
-      const validatedTrips = trips.map(trip => insertTripSchema.parse(trip));
+      // Validate ALL trips before making any changes to the database
+      // This ensures we don't delete data if validation fails
+      let validatedTrips;
+      try {
+        validatedTrips = trips.map(trip => insertTripSchema.parse(trip));
+      } catch (validationError) {
+        if (validationError instanceof z.ZodError) {
+          return res.status(400).json({ 
+            message: "Validation error in CSV data. No changes were made to the database.",
+            errors: validationError.errors 
+          });
+        }
+        throw validationError;
+      }
       
-      // Delete all existing trips and insert new ones
-      await storage.deleteAllTrips();
-      const createdTrips = await storage.createMultipleTrips(validatedTrips);
+      // Only proceed with deletion after all validation passes
+      console.log(`Starting import: deleting existing trips and creating ${validatedTrips.length} new trips`);
       
-      res.json({ 
-        message: "Import successful", 
-        count: createdTrips.length 
-      });
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ 
-          message: "Validation error in CSV data",
-          errors: error.errors 
+      try {
+        // Delete all existing trips
+        const deletedCount = await storage.deleteAllTrips();
+        console.log(`Deleted ${deletedCount} existing trips`);
+        
+        // Insert new trips
+        const createdTrips = await storage.createMultipleTrips(validatedTrips);
+        console.log(`Created ${createdTrips.length} new trips`);
+        
+        res.json({ 
+          message: "Import successful", 
+          count: createdTrips.length,
+          deleted: deletedCount
+        });
+      } catch (dbError) {
+        console.error("Database error during import:", dbError);
+        // Note: If delete succeeded but insert failed, database may be empty
+        // Users are warned about this in the UI confirmation dialog
+        res.status(500).json({ 
+          message: "Database error during import. Some data may have been lost. Please check your data and re-import if needed.",
+          error: dbError instanceof Error ? dbError.message : String(dbError)
         });
       }
+    } catch (error) {
       console.error("Error importing trips:", error);
       res.status(500).json({ message: "Failed to import trips" });
     }

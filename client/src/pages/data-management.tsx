@@ -99,11 +99,44 @@ export default function DataManagement() {
     const lines = text.trim().split("\n");
     if (lines.length < 2) return [];
 
-    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+    // Helper to parse a CSV line handling quoted values
+    const parseCSVLine = (line: string): string[] => {
+      const values: string[] = [];
+      let currentValue = "";
+      let insideQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const nextChar = line[i + 1];
+
+        if (char === '"') {
+          if (insideQuotes && nextChar === '"') {
+            // Escaped quote
+            currentValue += '"';
+            i++; // Skip next quote
+          } else {
+            // Toggle quote state
+            insideQuotes = !insideQuotes;
+          }
+        } else if (char === "," && !insideQuotes) {
+          // End of value
+          values.push(currentValue.trim());
+          currentValue = "";
+        } else {
+          currentValue += char;
+        }
+      }
+      
+      // Add last value
+      values.push(currentValue.trim());
+      return values;
+    };
+
+    const headers = parseCSVLine(lines[0]).map((h) => h.trim().toLowerCase());
     const trips = [];
 
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(",").map((v) => v.trim());
+      const values = parseCSVLine(lines[i]);
       const trip: any = {};
 
       headers.forEach((header, index) => {
@@ -202,8 +235,10 @@ export default function DataManagement() {
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Warning: Data Replacement</AlertTitle>
               <AlertDescription>
-                Importing will DELETE all {trips.length} existing trips and replace them with the data from your CSV file.
-                Make sure to export your current data first if you want to keep a backup.
+                <p className="font-semibold mb-2">Importing will DELETE all {trips.length} existing trips and replace them with your CSV data.</p>
+                <p className="text-sm">⚠️ <strong>Export your current data first</strong> as a backup.</p>
+                <p className="text-sm">⚠️ If an error occurs during import, data may be lost.</p>
+                <p className="text-sm">⚠️ This operation cannot be undone.</p>
               </AlertDescription>
             </Alert>
 
@@ -268,14 +303,15 @@ export default function DataManagement() {
               Are you absolutely sure?
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>This action will:</p>
+              <p className="font-semibold">This is a destructive operation that will:</p>
               <ul className="list-disc list-inside space-y-1 text-sm">
                 <li>Delete all {trips.length} existing trips from the database</li>
                 <li>Import {parsedTrips.length} new trips from your CSV file</li>
-                <li>Cannot be undone</li>
+                <li><strong>Cannot be undone</strong></li>
+                <li className="text-destructive"><strong>If an error occurs, data may be lost</strong></li>
               </ul>
-              <p className="font-semibold mt-4">
-                Make sure you have exported your current data if you need a backup.
+              <p className="font-semibold mt-4 text-destructive">
+                ⚠️ Have you exported your current data as a backup?
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
