@@ -71,8 +71,10 @@ Preferred communication style: Simple, everyday language.
 - **Admin Endpoints** (protected, require authentication):
   - `GET /api/admin/users` - List all registered users
   - `GET /api/admin/invitations` - List all invitation codes
-  - `POST /api/admin/invitations` - Generate new invitation code
+  - `POST /api/admin/invitations` - Generate new invitation code (accepts maxUses and expiresInHours)
   - `DELETE /api/admin/invitations/:id` - Revoke invitation code
+  - `GET /api/admin/settings/oauth` - Get OAuth access control settings
+  - `PUT /api/admin/settings/oauth` - Update OAuth access control settings
 
 **Request/Response Handling**
 - Zod schema validation on incoming requests
@@ -95,9 +97,15 @@ Preferred communication style: Simple, everyday language.
 - **Users Table**: Stores user authentication data (id, email, firstName, lastName, profileImageUrl, authProvider)
   - `authProvider`: Distinguishes between "oidc" (OAuth) and "invitation" (invitation-based) users
 - **Sessions Table**: Stores session data for authentication with PostgreSQL connect-pg-simple
-- **Invitation Codes Table**: Manages invitation codes for signup
-  - Tracks code status: unused, used, or revoked
+- **Invitation Codes Table**: Manages invitation codes for signup with advanced features
+  - `maxUses`: Maximum number of times the code can be used (default: 1)
+  - `currentUses`: Current usage count (increments on each use)
+  - `expiresAt`: Optional expiration timestamp
+  - Tracks code status: active, used up, expired, or revoked
   - Records who created the code and who used it
+- **Settings Table**: Key-value store for application-wide settings
+  - `key`: Unique identifier for the setting (e.g., "allowed_domains", "allowed_github_orgs")
+  - `value`: JSON value for flexible data storage
 - **Trips Table**: Single entity with fields for name, flight date/time, flight number, car status, and timestamps
 - **Validation**: Drizzle-Zod integration generates Zod schemas from database schema for consistent validation
 - **Type Generation**: TypeScript types inferred from schema for compile-time safety
@@ -159,13 +167,35 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
+### OAuth Access Controls & Enhanced Invitations (October 3, 2025)
+Implemented OAuth access restrictions and enhanced invitation code system:
+
+**OAuth Access Control:**
+- **Domain Validation**: Restrict Google OAuth logins to specific email domains (e.g., only @company.com)
+- **GitHub Organizations**: Framework for restricting GitHub logins to organization members (full implementation pending)
+- **Admin UI**: New "OAuth Settings" tab in `/admin` page for managing allowed domains and GitHub organizations
+- **Settings Storage**: New database table for storing application-wide settings as key-value pairs
+- **Validation**: OAuth callback checks email domain against allowed domains list before creating user session
+
+**Enhanced Invitation Codes:**
+- **Multi-Use Codes**: Invitation codes can now be reused (configurable max uses, default: 1)
+- **Expiration**: Codes expire after configurable hours (default: 24 hours)
+- **Usage Tracking**: Database tracks `currentUses` vs `maxUses` for each invitation code
+- **Advanced Dialog**: New creation dialog with inputs for max uses and expiration hours
+- **Updated Display**: Invitation table shows usage count (e.g., "2 / 5"), expiration time, and status (Active/Used Up/Expired/Revoked)
+- **Validation**: Backend validates invitation codes for existence, usage limits, expiration, and revocation status
+
+**Bug Fixes:**
+- Fixed infinite render loop in Admin OAuth Settings tab (moved state updates to useEffect)
+- Fixed invitation users access to trip data (added `expires_at` field to invitation user sessions)
+
 ### Invitation System (October 3, 2025)
 Added invitation-based signup system for users without OAuth accounts:
 - **Landing Page**: "Join by Invitation" button opens signup dialog for invitation code entry
-- **Admin Page**: New `/admin` route with three tabs:
+- **Admin Page**: New `/admin` route with four tabs:
   - **Users Tab**: List all registered users with authentication method badges (OAuth vs Invitation)
   - **Invitations Tab**: Create, list, copy, and revoke invitation codes
+  - **OAuth Settings Tab**: Manage allowed domains and GitHub organizations
   - **Data Tab**: CSV export/import functionality (moved from separate /data page)
 - **Security**: All invitation codes validated for existence, usage status, and revocation
 - **Navigation**: Header updated to show "Admin" link for authenticated users
-- **Authentication Fix**: Invitation users now receive a session with `expires_at` set to 1 year (while respecting 7-day session TTL), ensuring compatibility with the `isAuthenticated` middleware used by OAuth users
