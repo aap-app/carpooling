@@ -117,10 +117,12 @@ export default function Admin() {
   });
 
   // Update local state when OAuth settings are loaded
-  if (oauthSettings && (allowedDomains.length === 0 && allowedGitHubOrgs.length === 0)) {
-    setAllowedDomains(oauthSettings.allowedDomains || []);
-    setAllowedGitHubOrgs(oauthSettings.allowedGitHubOrgs || []);
-  }
+  React.useEffect(() => {
+    if (oauthSettings) {
+      setAllowedDomains(oauthSettings.allowedDomains || []);
+      setAllowedGitHubOrgs(oauthSettings.allowedGitHubOrgs || []);
+    }
+  }, [oauthSettings]);
 
   // Update OAuth settings mutation
   const updateOAuthSettingsMutation = useMutation({
