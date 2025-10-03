@@ -14,19 +14,42 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table for Replit Auth
+// User storage table for Replit Auth and invitation-based users
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  authProvider: varchar("auth_provider").notNull().default("oidc"), // 'oidc' or 'invitation'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Invitation codes table for invite-based signup
+export const invitationCodes = pgTable("invitation_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").notNull().unique(),
+  createdByUserId: varchar("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  revokedAt: timestamp("revoked_at"),
+  usedByUserId: varchar("used_by_user_id"),
+  usedAt: timestamp("used_at"),
+});
+
+export const insertInvitationCodeSchema = createInsertSchema(invitationCodes).omit({
+  id: true,
+  createdAt: true,
+  revokedAt: true,
+  usedByUserId: true,
+  usedAt: true,
+});
+
+export type InsertInvitationCode = z.infer<typeof insertInvitationCodeSchema>;
+export type InvitationCode = typeof invitationCodes.$inferSelect;
 
 export const trips = pgTable("trips", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

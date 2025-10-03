@@ -1,12 +1,15 @@
-import { type Trip, type InsertTrip, trips, type User, type UpsertUser, users } from "@shared/schema";
+import { type Trip, type InsertTrip, trips, type User, type UpsertUser, users, type InvitationCode, type InsertInvitationCode, invitationCodes } from "@shared/schema";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, isNull, desc } from "drizzle-orm";
 
 export interface IStorage {
-  // User methods for Replit Auth
+  // User methods for Replit Auth and invitation users
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  createUser(user: UpsertUser): Promise<User>;
+  getAllUsers(): Promise<User[]>;
   
   // Trip methods
   getAllTrips(): Promise<Trip[]>;
@@ -16,6 +19,13 @@ export interface IStorage {
   deleteTrip(id: string): Promise<boolean>;
   deleteAllTrips(): Promise<number>;
   createMultipleTrips(trips: InsertTrip[]): Promise<Trip[]>;
+  
+  // Invitation code methods
+  createInvitationCode(code: InsertInvitationCode): Promise<InvitationCode>;
+  getAllInvitationCodes(): Promise<InvitationCode[]>;
+  getInvitationCodeByCode(code: string): Promise<InvitationCode | undefined>;
+  revokeInvitationCode(id: string): Promise<InvitationCode | undefined>;
+  markInvitationCodeAsUsed(id: string, usedByUserId: string): Promise<InvitationCode | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -45,6 +55,21 @@ export class DbStorage implements IStorage {
     }
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    try {
+      const result = await this.db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      
+      return result[0];
+    } catch (error) {
+      console.error("getUserByEmail error:", error);
+      throw error;
+    }
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     try {
       const result = await this.db
@@ -62,6 +87,34 @@ export class DbStorage implements IStorage {
       return result[0];
     } catch (error) {
       console.error("upsertUser error:", error);
+      throw error;
+    }
+  }
+
+  async createUser(userData: UpsertUser): Promise<User> {
+    try {
+      const result = await this.db
+        .insert(users)
+        .values(userData)
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("createUser error:", error);
+      throw error;
+    }
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    try {
+      const result = await this.db
+        .select()
+        .from(users)
+        .orderBy(desc(users.createdAt));
+      
+      return result;
+    } catch (error) {
+      console.error("getAllUsers error:", error);
       throw error;
     }
   }
@@ -166,6 +219,83 @@ export class DbStorage implements IStorage {
       return result;
     } catch (error) {
       console.error("createMultipleTrips error:", error);
+      throw error;
+    }
+  }
+
+  // Invitation code methods
+  async createInvitationCode(codeData: InsertInvitationCode): Promise<InvitationCode> {
+    try {
+      const result = await this.db
+        .insert(invitationCodes)
+        .values(codeData)
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("createInvitationCode error:", error);
+      throw error;
+    }
+  }
+
+  async getAllInvitationCodes(): Promise<InvitationCode[]> {
+    try {
+      const result = await this.db
+        .select()
+        .from(invitationCodes)
+        .orderBy(desc(invitationCodes.createdAt));
+      
+      return result;
+    } catch (error) {
+      console.error("getAllInvitationCodes error:", error);
+      throw error;
+    }
+  }
+
+  async getInvitationCodeByCode(code: string): Promise<InvitationCode | undefined> {
+    try {
+      const result = await this.db
+        .select()
+        .from(invitationCodes)
+        .where(eq(invitationCodes.code, code))
+        .limit(1);
+      
+      return result[0];
+    } catch (error) {
+      console.error("getInvitationCodeByCode error:", error);
+      throw error;
+    }
+  }
+
+  async revokeInvitationCode(id: string): Promise<InvitationCode | undefined> {
+    try {
+      const result = await this.db
+        .update(invitationCodes)
+        .set({ revokedAt: new Date() })
+        .where(eq(invitationCodes.id, id))
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("revokeInvitationCode error:", error);
+      throw error;
+    }
+  }
+
+  async markInvitationCodeAsUsed(id: string, usedByUserId: string): Promise<InvitationCode | undefined> {
+    try {
+      const result = await this.db
+        .update(invitationCodes)
+        .set({ 
+          usedByUserId,
+          usedAt: new Date()
+        })
+        .where(eq(invitationCodes.id, id))
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("markInvitationCodeAsUsed error:", error);
       throw error;
     }
   }
