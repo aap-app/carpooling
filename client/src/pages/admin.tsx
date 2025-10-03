@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -117,7 +117,7 @@ export default function Admin() {
   });
 
   // Update local state when OAuth settings are loaded
-  React.useEffect(() => {
+  useEffect(() => {
     if (oauthSettings) {
       setAllowedDomains(oauthSettings.allowedDomains || []);
       setAllowedGitHubOrgs(oauthSettings.allowedGitHubOrgs || []);
