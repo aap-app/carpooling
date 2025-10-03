@@ -13,10 +13,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Users, Key, Database, Copy, Trash2, AlertTriangle, Download, Upload, CheckCircle, XCircle, Settings, Plus, X as XIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import type { User, InvitationCode, Trip } from "@shared/schema";
 
 export default function Admin() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parsedTrips, setParsedTrips] = useState<any[]>([]);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
@@ -600,14 +602,16 @@ export default function Admin() {
               </CardContent>
             </Card>
 
-            <Card className="border-red-200 dark:border-red-900">
-              <CardHeader>
-                <CardTitle className="text-red-600 dark:text-red-400">Import Data</CardTitle>
-                <CardDescription>
-                  Upload a CSV file to replace ALL existing trips. This action cannot be undone.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            {/* Only show import to users with "Fedor" in their name */}
+            {currentUser && (currentUser.firstName?.includes("Fedor") || currentUser.lastName?.includes("Fedor")) && (
+              <Card className="border-red-200 dark:border-red-900">
+                <CardHeader>
+                  <CardTitle className="text-red-600 dark:text-red-400">Import Data</CardTitle>
+                  <CardDescription>
+                    Upload a CSV file to replace ALL existing trips. This action cannot be undone.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Warning: Data Replacement</AlertTitle>
@@ -660,6 +664,7 @@ export default function Admin() {
                 </div>
               </CardContent>
             </Card>
+            )}
           </div>
         </TabsContent>
       </Tabs>
