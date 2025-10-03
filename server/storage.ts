@@ -1,5 +1,7 @@
-import { type Trip, type InsertTrip } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { type Trip, type InsertTrip, trips } from "@shared/schema";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
+import { eq, asc } from "drizzle-orm";
 
 export interface IStorage {
   // Trip methods
@@ -10,55 +12,90 @@ export interface IStorage {
   deleteTrip(id: string): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private trips: Map<string, Trip>;
+export class DbStorage implements IStorage {
+  private db;
 
   constructor() {
-    this.trips = new Map();
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL environment variable is not set");
+    }
+    const sql = neon(process.env.DATABASE_URL);
+    this.db = drizzle(sql);
   }
 
   async getAllTrips(): Promise<Trip[]> {
-    const trips = Array.from(this.trips.values());
-    // Sort by flight date and time (earliest first)
-    return trips.sort((a, b) => {
-      const dateTimeA = new Date(`${a.flightDate}T${a.flightTime}`);
-      const dateTimeB = new Date(`${b.flightDate}T${b.flightTime}`);
-      return dateTimeA.getTime() - dateTimeB.getTime();
-    });
+    try {
+      const result = await this.db
+        .select()
+        .from(trips)
+        .orderBy(asc(trips.flightDate), asc(trips.flightTime));
+      
+      return result;
+    } catch (error) {
+      console.error("getAllTrips error:", error);
+      throw error;
+    }
   }
 
   async getTripById(id: string): Promise<Trip | undefined> {
-    return this.trips.get(id);
+    try {
+      const result = await this.db
+        .select()
+        .from(trips)
+        .where(eq(trips.id, id))
+        .limit(1);
+      
+      return result[0];
+    } catch (error) {
+      console.error("getTripById error:", error);
+      throw error;
+    }
   }
 
   async createTrip(insertTrip: InsertTrip): Promise<Trip> {
-    const id = randomUUID();
-    const trip: Trip = {
-      ...insertTrip,
-      id,
-      createdAt: new Date(),
-    };
-    this.trips.set(id, trip);
-    return trip;
+    try {
+      console.log("Creating trip with data:", insertTrip);
+      const result = await this.db
+        .insert(trips)
+        .values(insertTrip)
+        .returning();
+      
+      console.log("Created trip:", result[0]);
+      return result[0];
+    } catch (error) {
+      console.error("createTrip error:", error);
+      throw error;
+    }
   }
 
   async updateTrip(id: string, updates: Partial<InsertTrip>): Promise<Trip | undefined> {
-    const existingTrip = this.trips.get(id);
-    if (!existingTrip) {
-      return undefined;
+    try {
+      const result = await this.db
+        .update(trips)
+        .set(updates)
+        .where(eq(trips.id, id))
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("updateTrip error:", error);
+      throw error;
     }
-
-    const updatedTrip: Trip = {
-      ...existingTrip,
-      ...updates,
-    };
-    this.trips.set(id, updatedTrip);
-    return updatedTrip;
   }
 
   async deleteTrip(id: string): Promise<boolean> {
-    return this.trips.delete(id);
+    try {
+      const result = await this.db
+        .delete(trips)
+        .where(eq(trips.id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error("deleteTrip error:", error);
+      throw error;
+    }
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DbStorage();

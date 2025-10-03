@@ -41,7 +41,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           errors: error.errors 
         });
       }
-      res.status(500).json({ message: "Failed to create trip" });
+      console.error("Error creating trip:", error);
+      res.status(500).json({ message: "Failed to create trip", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
