@@ -1,9 +1,13 @@
-import { type Trip, type InsertTrip, trips } from "@shared/schema";
+import { type Trip, type InsertTrip, trips, type User, type UpsertUser, users } from "@shared/schema";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, asc } from "drizzle-orm";
 
 export interface IStorage {
+  // User methods for Replit Auth
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  
   // Trip methods
   getAllTrips(): Promise<Trip[]>;
   getTripById(id: string): Promise<Trip | undefined>;
@@ -21,6 +25,43 @@ export class DbStorage implements IStorage {
     }
     const sql = neon(process.env.DATABASE_URL);
     this.db = drizzle(sql);
+  }
+
+  // User methods for Replit Auth
+  async getUser(id: string): Promise<User | undefined> {
+    try {
+      const result = await this.db
+        .select()
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+      
+      return result[0];
+    } catch (error) {
+      console.error("getUser error:", error);
+      throw error;
+    }
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    try {
+      const result = await this.db
+        .insert(users)
+        .values(userData)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            ...userData,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      
+      return result[0];
+    } catch (error) {
+      console.error("upsertUser error:", error);
+      throw error;
+    }
   }
 
   async getAllTrips(): Promise<Trip[]> {

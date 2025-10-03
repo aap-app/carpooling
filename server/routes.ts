@@ -3,10 +3,31 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTripSchema } from "@shared/schema";
 import { z } from "zod";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Get all trips
-  app.get("/api/trips", async (_req, res) => {
+  // Setup Replit Auth
+  await setupAuth(app);
+
+  // Auth routes - NOT protected, returns null for unauthenticated users
+  app.get('/api/auth/user', async (req: any, res) => {
+    try {
+      // Return null if not authenticated
+      if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+        return res.json(null);
+      }
+      
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user || null);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Get all trips (protected)
+  app.get("/api/trips", isAuthenticated, async (_req, res) => {
     try {
       const trips = await storage.getAllTrips();
       res.json(trips);
@@ -15,8 +36,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get trip by ID
-  app.get("/api/trips/:id", async (req, res) => {
+  // Get trip by ID (protected)
+  app.get("/api/trips/:id", isAuthenticated, async (req, res) => {
     try {
       const trip = await storage.getTripById(req.params.id);
       if (!trip) {
@@ -28,8 +49,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create new trip
-  app.post("/api/trips", async (req, res) => {
+  // Create new trip (protected)
+  app.post("/api/trips", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertTripSchema.parse(req.body);
       const trip = await storage.createTrip(validatedData);
@@ -46,8 +67,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update trip
-  app.put("/api/trips/:id", async (req, res) => {
+  // Update trip (protected)
+  app.put("/api/trips/:id", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertTripSchema.partial().parse(req.body);
       const trip = await storage.updateTrip(req.params.id, validatedData);
@@ -66,8 +87,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete trip
-  app.delete("/api/trips/:id", async (req, res) => {
+  // Delete trip (protected)
+  app.delete("/api/trips/:id", isAuthenticated, async (req, res) => {
     try {
       const deleted = await storage.deleteTrip(req.params.id);
       if (!deleted) {

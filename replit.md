@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a full-stack airport carpool coordination application built with Express.js, React, and PostgreSQL. The application allows users to create and manage airport trip listings, including flight details and car-sharing status. Users can add trips with flight information, view all trips sorted by date/time, and update their car-sharing preferences (booked, looking for rides, or offering to share).
+This is a full-stack airport carpool coordination application built with Express.js, React, and PostgreSQL. The application allows users to create and manage airport trip listings, including flight details and car-sharing status. Users must log in with Replit Auth (supporting Google, GitHub, X, Apple, or email/password) to access the application. Once authenticated, users can add trips with flight information, view all trips sorted by date/time, and update their car-sharing preferences (booked, looking for rides, or offering to share).
 
 ## User Preferences
 
@@ -15,7 +15,9 @@ Preferred communication style: Simple, everyday language.
 **Framework & Build System**
 - **React with Vite**: The frontend uses React with Vite as the build tool and development server, providing fast hot module replacement (HMR) and optimized production builds.
 - **TypeScript**: Strict TypeScript configuration ensures type safety across the application.
-- **Routing**: Uses Wouter for lightweight client-side routing with two main routes: `/add` for creating trips and `/trips` for viewing all trips.
+- **Routing**: Uses Wouter for lightweight client-side routing with conditional rendering based on authentication state:
+  - Unauthenticated users see landing page at `/`
+  - Authenticated users have access to: `/` (home/add trip), `/add` (add trip), `/trips` (view all trips)
 
 **UI Framework**
 - **shadcn/ui Components**: Extensive use of Radix UI primitives wrapped in a customized component library (44+ UI components in the ui folder).
@@ -38,8 +40,18 @@ Preferred communication style: Simple, everyday language.
 - **Express.js**: RESTful API server with middleware for JSON parsing, URL encoding, and request logging.
 - **Custom Vite Integration**: Development mode serves frontend through Vite middleware; production serves static files.
 
+**Authentication & Authorization**
+- **Replit Auth Integration**: OpenID Connect provider supporting Google, GitHub, X, Apple, and email/password login
+- **Session Management**: PostgreSQL-backed sessions with 7-day TTL, secure cookies (HTTPS in production)
+- **Middleware**: `isAuthenticated` middleware protects trip routes, validates and refreshes tokens automatically
+- **Auth Routes**:
+  - `GET /api/login` - Initiates OAuth flow
+  - `GET /api/callback` - OAuth callback handler
+  - `GET /api/logout` - Logs out and clears session
+  - `GET /api/auth/user` - Returns current user or null (public endpoint)
+
 **API Structure**
-- RESTful endpoints under `/api/trips`:
+- RESTful endpoints under `/api/trips` (all protected, require authentication):
   - `GET /api/trips` - List all trips
   - `GET /api/trips/:id` - Get single trip
   - `POST /api/trips` - Create trip
@@ -64,9 +76,11 @@ Preferred communication style: Simple, everyday language.
 - **Schema Location**: Database schema defined in `shared/schema.ts` for type sharing between client and server.
 
 **Data Model**
-- **Trips Table**: Single entity with fields for name, flight date/time, flight number, car status, and timestamps.
-- **Validation**: Drizzle-Zod integration generates Zod schemas from database schema for consistent validation.
-- **Type Generation**: TypeScript types inferred from schema for compile-time safety.
+- **Users Table**: Stores user authentication data (id, email, firstName, lastName, profileImageUrl) synced from Replit Auth
+- **Sessions Table**: Stores session data for authentication with PostgreSQL connect-pg-simple
+- **Trips Table**: Single entity with fields for name, flight date/time, flight number, car status, and timestamps
+- **Validation**: Drizzle-Zod integration generates Zod schemas from database schema for consistent validation
+- **Type Generation**: TypeScript types inferred from schema for compile-time safety
 
 **Migration Strategy**
 - Drizzle Kit handles schema migrations with `npm run db:push` for development.
@@ -98,6 +112,14 @@ Preferred communication style: Simple, everyday language.
 - @replit/vite-plugin-runtime-error-modal for error overlays
 - @replit/vite-plugin-cartographer for code navigation
 - tsx for TypeScript execution in development
+
+**Authentication**
+- passport for authentication middleware
+- passport-local for local strategy
+- openid-client for OpenID Connect (Replit Auth)
+- express-session for session management
+- connect-pg-simple for PostgreSQL session store
+- memoizee for caching OIDC configuration
 
 **Database**
 - @neondatabase/serverless for PostgreSQL connections
