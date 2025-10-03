@@ -14,6 +14,8 @@ export interface IStorage {
   createTrip(trip: InsertTrip): Promise<Trip>;
   updateTrip(id: string, trip: Partial<InsertTrip>): Promise<Trip | undefined>;
   deleteTrip(id: string): Promise<boolean>;
+  deleteAllTrips(): Promise<number>;
+  createMultipleTrips(trips: InsertTrip[]): Promise<Trip[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -134,6 +136,36 @@ export class DbStorage implements IStorage {
       return result.length > 0;
     } catch (error) {
       console.error("deleteTrip error:", error);
+      throw error;
+    }
+  }
+
+  async deleteAllTrips(): Promise<number> {
+    try {
+      const result = await this.db
+        .delete(trips)
+        .returning();
+      
+      console.log(`Deleted ${result.length} trips`);
+      return result.length;
+    } catch (error) {
+      console.error("deleteAllTrips error:", error);
+      throw error;
+    }
+  }
+
+  async createMultipleTrips(tripsToCreate: InsertTrip[]): Promise<Trip[]> {
+    try {
+      console.log(`Creating ${tripsToCreate.length} trips`);
+      const result = await this.db
+        .insert(trips)
+        .values(tripsToCreate)
+        .returning();
+      
+      console.log(`Created ${result.length} trips`);
+      return result;
+    } catch (error) {
+      console.error("createMultipleTrips error:", error);
       throw error;
     }
   }

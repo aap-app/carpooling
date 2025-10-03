@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Car, Plus, List, LogOut, User } from "lucide-react";
+import { Car, Plus, List, LogOut, User, Database } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -68,6 +68,18 @@ export default function Header() {
                 >
                   <List className="mr-1.5 h-3 w-3" />
                   View Trips
+                </Link>
+                <Link 
+                  href="/data"
+                  className={`inline-flex items-center text-xs px-3 py-1.5 rounded-md transition-colors ${
+                    location === "/data" 
+                      ? "bg-card shadow-sm text-foreground" 
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  data-testid="link-data-management"
+                >
+                  <Database className="mr-1.5 h-3 w-3" />
+                  Data
                 </Link>
               </div>
             )}

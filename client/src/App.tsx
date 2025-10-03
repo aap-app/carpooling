@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import AddTrip from "@/pages/add-trip";
 import ListTrips from "@/pages/list-trips";
+import DataManagement from "@/pages/data-management";
 import Landing from "@/pages/landing";
 import Header from "@/components/header";
 import { useAuth } from "@/hooks/useAuth";
@@ -33,6 +34,7 @@ function Router() {
           <Route path="/" component={AddTrip} />
           <Route path="/add" component={AddTrip} />
           <Route path="/trips" component={ListTrips} />
+          <Route path="/data" component={DataManagement} />
         </>
       )}
       <Route component={NotFound} />
