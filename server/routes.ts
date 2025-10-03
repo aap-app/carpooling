@@ -148,6 +148,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Increment invitation code usage
       await storage.incrementInvitationCodeUsage(invitation.id, userId);
 
+      // Clear the requires invitation flag from session
+      delete (req.session as any).requiresInvitationCode;
+
       res.json({ message: "Invitation code validated successfully" });
     } catch (error) {
       if (error instanceof z.ZodError) {

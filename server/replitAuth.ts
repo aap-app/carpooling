@@ -159,8 +159,9 @@ export async function setupAuth(app: Express) {
         // Check if this was an invitation-based signup
         const pendingInvitation = (req.session as any).pendingInvitation;
         if (pendingInvitation) {
-          // Clear the flag and redirect to invitation code entry
+          // Clear the pending flag and set requires invitation flag
           delete (req.session as any).pendingInvitation;
+          (req.session as any).requiresInvitationCode = true;
           return res.redirect("/complete-invitation");
         }
         
@@ -187,6 +188,18 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   if (!req.isAuthenticated() || !user.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Check if user has a pending invitation that needs to be completed
+  // Allow the validation endpoint itself to pass through
+  const pendingInvitation = (req.session as any).requiresInvitationCode;
+  const isValidationEndpoint = req.path === "/api/invitations/validate" && req.method === "POST";
+  
+  if (pendingInvitation && !isValidationEndpoint) {
+    return res.status(403).json({ 
+      message: "Invitation code required",
+      requiresInvitationCode: true 
+    });
   }
 
   const now = Math.floor(Date.now() / 1000);

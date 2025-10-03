@@ -3,6 +3,21 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    
+    // Check if invitation code is required
+    if (res.status === 403) {
+      try {
+        const errorData = JSON.parse(text);
+        if (errorData.requiresInvitationCode) {
+          // Redirect to complete invitation page
+          window.location.href = "/complete-invitation";
+          return;
+        }
+      } catch (e) {
+        // Not JSON or doesn't have the flag, continue with normal error handling
+      }
+    }
+    
     throw new Error(`${res.status}: ${text}`);
   }
 }
