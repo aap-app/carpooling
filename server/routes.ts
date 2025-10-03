@@ -83,7 +83,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.markInvitationCodeAsUsed(invitation.id, newUser.id);
 
       // Log the user in by creating a session
-      req.login({ claims: { sub: newUser.id, email: newUser.email } }, (err: any) => {
+      // Set expires_at to a far future date (invitation users don't have token expiry)
+      const farFuture = Math.floor(Date.now() / 1000) + (365 * 24 * 60 * 60); // 1 year from now
+      req.login({ 
+        claims: { sub: newUser.id, email: newUser.email },
+        expires_at: farFuture,
+      }, (err: any) => {
         if (err) {
           console.error("Login error:", err);
           return res.status(500).json({ message: "Failed to create session" });

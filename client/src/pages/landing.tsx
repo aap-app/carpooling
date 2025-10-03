@@ -47,13 +47,10 @@ export default function Landing() {
       setTimeout(() => window.location.reload(), 1000);
     },
     onError: (error: any) => {
-      console.error("Signup error:", error);
-      
       // Extract error message from response
       let errorMessage = "Failed to create account. Please check your invitation code.";
       
       if (error?.message) {
-        console.log("Error message:", error.message);
         // Error message format: "400: {json}" or "400: plain text"
         try {
           const match = error.message.match(/\d+:\s*(.+)/);
@@ -64,12 +61,10 @@ export default function Landing() {
           }
         } catch (parseError) {
           // If JSON parsing fails, use the whole error message
-          console.log("Failed to parse error, using raw message");
           errorMessage = error.message;
         }
       }
       
-      console.log("Showing toast with message:", errorMessage);
       toast({
         title: "Signup failed",
         description: errorMessage,

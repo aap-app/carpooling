@@ -159,7 +159,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
-### Invitation System
+### Invitation System (October 3, 2025)
 Added invitation-based signup system for users without OAuth accounts:
 - **Landing Page**: "Join by Invitation" button opens signup dialog for invitation code entry
 - **Admin Page**: New `/admin` route with three tabs:
@@ -168,3 +168,4 @@ Added invitation-based signup system for users without OAuth accounts:
   - **Data Tab**: CSV export/import functionality (moved from separate /data page)
 - **Security**: All invitation codes validated for existence, usage status, and revocation
 - **Navigation**: Header updated to show "Admin" link for authenticated users
+- **Authentication Fix**: Invitation users now receive a session with `expires_at` set to 1 year (while respecting 7-day session TTL), ensuring compatibility with the `isAuthenticated` middleware used by OAuth users
