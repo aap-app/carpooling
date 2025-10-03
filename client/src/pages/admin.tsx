@@ -111,6 +111,64 @@ export default function Admin() {
     },
   });
 
+  // Fetch OAuth settings
+  const { data: oauthSettings } = useQuery<{ allowedDomains: string[]; allowedGitHubOrgs: string[] }>({
+    queryKey: ["/api/admin/settings/oauth"],
+  });
+
+  // Update local state when OAuth settings are loaded
+  if (oauthSettings && (allowedDomains.length === 0 && allowedGitHubOrgs.length === 0)) {
+    setAllowedDomains(oauthSettings.allowedDomains || []);
+    setAllowedGitHubOrgs(oauthSettings.allowedGitHubOrgs || []);
+  }
+
+  // Update OAuth settings mutation
+  const updateOAuthSettingsMutation = useMutation({
+    mutationFn: async (settings: { allowedDomains: string[]; allowedGitHubOrgs: string[] }) => {
+      const response = await apiRequest("PUT", "/api/admin/settings/oauth", settings);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Settings saved",
+        description: "OAuth settings have been updated.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/oauth"] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update OAuth settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create invitation with configuration
+  const createConfiguredInvitationMutation = useMutation({
+    mutationFn: async (params: { maxUses: number; expiresInHours: number }) => {
+      const response = await apiRequest("POST", "/api/admin/invitations", params);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Invitation code created",
+        description: "A new invitation code has been generated.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/invitations"] });
+      setIsCreateInviteDialogOpen(false);
+      setInviteMaxUses(1);
+      setInviteExpiresInHours(24);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create invitation code",
+        variant: "destructive",
+      });
+    },
+  });
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
@@ -215,6 +273,39 @@ export default function Admin() {
     importMutation.mutate(parsedTrips);
   };
 
+  const addDomain = () => {
+    if (newDomain && !allowedDomains.includes(newDomain)) {
+      setAllowedDomains([...allowedDomains, newDomain]);
+      setNewDomain("");
+    }
+  };
+
+  const removeDomain = (domain: string) => {
+    setAllowedDomains(allowedDomains.filter(d => d !== domain));
+  };
+
+  const addGitHubOrg = () => {
+    if (newOrg && !allowedGitHubOrgs.includes(newOrg)) {
+      setAllowedGitHubOrgs([...allowedGitHubOrgs, newOrg]);
+      setNewOrg("");
+    }
+  };
+
+  const removeGitHubOrg = (org: string) => {
+    setAllowedGitHubOrgs(allowedGitHubOrgs.filter(o => o !== org));
+  };
+
+  const saveOAuthSettings = () => {
+    updateOAuthSettingsMutation.mutate({ allowedDomains, allowedGitHubOrgs });
+  };
+
+  const createInvitationWithConfig = () => {
+    createConfiguredInvitationMutation.mutate({
+      maxUses: inviteMaxUses,
+      expiresInHours: inviteExpiresInHours,
+    });
+  };
+
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
@@ -231,6 +322,10 @@ export default function Admin() {
           <TabsTrigger value="invitations" data-testid="tab-invitations">
             <Key className="h-4 w-4 mr-2" />
             Invitations
+          </TabsTrigger>
+          <TabsTrigger value="oauth" data-testid="tab-oauth">
+            <Settings className="h-4 w-4 mr-2" />
+            OAuth Settings
           </TabsTrigger>
           <TabsTrigger value="data" data-testid="tab-data">
             <Database className="h-4 w-4 mr-2" />
@@ -291,12 +386,11 @@ export default function Admin() {
             </CardHeader>
             <CardContent className="space-y-4">
               <Button
-                onClick={() => createInvitationMutation.mutate()}
-                disabled={createInvitationMutation.isPending}
+                onClick={() => setIsCreateInviteDialogOpen(true)}
                 data-testid="button-create-invitation"
               >
-                <Key className="h-4 w-4 mr-2" />
-                {createInvitationMutation.isPending ? "Creating..." : "Generate New Code"}
+                <Plus className="h-4 w-4 mr-2" />
+                Generate New Code
               </Button>
 
               {invitationsLoading ? (
@@ -309,68 +403,182 @@ export default function Admin() {
                     <TableRow>
                       <TableHead>Code</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Used By</TableHead>
+                      <TableHead>Usage</TableHead>
+                      <TableHead>Expires</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {invitations.map((invitation) => (
-                      <TableRow key={invitation.id} data-testid={`row-invitation-${invitation.id}`}>
-                        <TableCell className="font-mono font-medium">{invitation.code}</TableCell>
-                        <TableCell>
-                          {invitation.revokedAt ? (
-                            <Badge variant="destructive" data-testid={`status-revoked-${invitation.id}`}>
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Revoked
-                            </Badge>
-                          ) : invitation.usedAt ? (
-                            <Badge variant="secondary" data-testid={`status-used-${invitation.id}`}>
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Used
-                            </Badge>
-                          ) : (
-                            <Badge variant="default" data-testid={`status-active-${invitation.id}`}>
-                              Active
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {new Date(invitation.createdAt!).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {invitation.usedByUserId ? invitation.usedByUserId.slice(0, 8) + "..." : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {!invitation.revokedAt && !invitation.usedAt && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => copyToClipboard(invitation.code)}
-                                  data-testid={`button-copy-${invitation.id}`}
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => revokeInvitationMutation.mutate(invitation.id)}
-                                  disabled={revokeInvitationMutation.isPending}
-                                  data-testid={`button-revoke-${invitation.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </>
+                    {invitations.map((invitation) => {
+                      const isExpired = invitation.expiresAt && new Date(invitation.expiresAt) < new Date();
+                      const isFullyUsed = invitation.currentUses >= invitation.maxUses;
+                      return (
+                        <TableRow key={invitation.id} data-testid={`row-invitation-${invitation.id}`}>
+                          <TableCell className="font-mono font-medium">{invitation.code}</TableCell>
+                          <TableCell>
+                            {invitation.revokedAt ? (
+                              <Badge variant="destructive" data-testid={`status-revoked-${invitation.id}`}>
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Revoked
+                              </Badge>
+                            ) : isExpired ? (
+                              <Badge variant="secondary" data-testid={`status-expired-${invitation.id}`}>
+                                Expired
+                              </Badge>
+                            ) : isFullyUsed ? (
+                              <Badge variant="secondary" data-testid={`status-used-${invitation.id}`}>
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Used Up
+                              </Badge>
+                            ) : (
+                              <Badge variant="default" data-testid={`status-active-${invitation.id}`}>
+                                Active
+                              </Badge>
                             )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {invitation.currentUses} / {invitation.maxUses}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {invitation.expiresAt 
+                              ? new Date(invitation.expiresAt).toLocaleString()
+                              : "Never"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              {!invitation.revokedAt && !isExpired && !isFullyUsed && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => copyToClipboard(invitation.code)}
+                                    data-testid={`button-copy-${invitation.id}`}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => revokeInvitationMutation.mutate(invitation.id)}
+                                    disabled={revokeInvitationMutation.isPending}
+                                    data-testid={`button-revoke-${invitation.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="oauth">
+          <Card>
+            <CardHeader>
+              <CardTitle>OAuth Access Control</CardTitle>
+              <CardDescription>Restrict who can log in using OAuth providers</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="allowed-domains" className="text-base font-semibold">
+                    Allowed Email Domains (Google Auth)
+                  </Label>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Only users with email addresses from these domains can log in via Google. Leave empty to allow all domains.
+                  </p>
+                  <div className="flex gap-2 mb-3">
+                    <Input
+                      id="allowed-domains"
+                      placeholder="example.com"
+                      value={newDomain}
+                      onChange={(e) => setNewDomain(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && addDomain()}
+                      data-testid="input-domain"
+                    />
+                    <Button onClick={addDomain} data-testid="button-add-domain">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
+                  {allowedDomains.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {allowedDomains.map((domain) => (
+                        <Badge key={domain} variant="secondary" className="pl-3 pr-1 py-1">
+                          {domain}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 ml-2"
+                            onClick={() => removeDomain(domain)}
+                            data-testid={`button-remove-domain-${domain}`}
+                          >
+                            <XIcon className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="allowed-orgs" className="text-base font-semibold">
+                    Allowed GitHub Organizations
+                  </Label>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Only users who are members of these GitHub organizations can log in. Leave empty to allow all GitHub users.
+                    <br />
+                    <span className="text-amber-600 dark:text-amber-500">Note: GitHub org validation requires additional setup and is not yet fully implemented.</span>
+                  </p>
+                  <div className="flex gap-2 mb-3">
+                    <Input
+                      id="allowed-orgs"
+                      placeholder="my-org"
+                      value={newOrg}
+                      onChange={(e) => setNewOrg(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && addGitHubOrg()}
+                      data-testid="input-github-org"
+                    />
+                    <Button onClick={addGitHubOrg} data-testid="button-add-github-org">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
+                  {allowedGitHubOrgs.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {allowedGitHubOrgs.map((org) => (
+                        <Badge key={org} variant="secondary" className="pl-3 pr-1 py-1">
+                          {org}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-4 w-4 p-0 ml-2"
+                            onClick={() => removeGitHubOrg(org)}
+                            data-testid={`button-remove-github-org-${org}`}
+                          >
+                            <XIcon className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <Button 
+                onClick={saveOAuthSettings}
+                disabled={updateOAuthSettingsMutation.isPending}
+                data-testid="button-save-oauth-settings"
+              >
+                {updateOAuthSettingsMutation.isPending ? "Saving..." : "Save OAuth Settings"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -453,6 +661,63 @@ export default function Admin() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isCreateInviteDialogOpen} onOpenChange={setIsCreateInviteDialogOpen}>
+        <DialogContent data-testid="dialog-create-invitation">
+          <DialogHeader>
+            <DialogTitle>Create Invitation Code</DialogTitle>
+            <DialogDescription>
+              Configure the invitation code settings
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="max-uses">Maximum Uses</Label>
+              <Input
+                id="max-uses"
+                type="number"
+                min="1"
+                value={inviteMaxUses}
+                onChange={(e) => setInviteMaxUses(parseInt(e.target.value) || 1)}
+                data-testid="input-max-uses"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                How many people can use this code (default: 1)
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="expires-in">Expires In (hours)</Label>
+              <Input
+                id="expires-in"
+                type="number"
+                min="1"
+                value={inviteExpiresInHours}
+                onChange={(e) => setInviteExpiresInHours(parseInt(e.target.value) || 24)}
+                data-testid="input-expires-in"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Code expiration time in hours (default: 24)
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateInviteDialogOpen(false)}
+              data-testid="button-cancel-create"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={createInvitationWithConfig}
+              disabled={createConfiguredInvitationMutation.isPending}
+              data-testid="button-confirm-create"
+            >
+              {createConfiguredInvitationMutation.isPending ? "Creating..." : "Create Code"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
         <AlertDialogContent data-testid="dialog-import-confirm">
