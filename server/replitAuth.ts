@@ -134,6 +134,11 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    // Store invitation flag in session if present
+    if (req.query.invitation === 'true') {
+      req.session.pendingInvitation = true;
+    }
+    
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
@@ -141,9 +146,27 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+    passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any) => {
+      if (err || !user) {
+        return res.redirect("/api/login");
+      }
+      
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          return next(loginErr);
+        }
+        
+        // Check if this was an invitation-based signup
+        const pendingInvitation = (req.session as any).pendingInvitation;
+        if (pendingInvitation) {
+          // Clear the flag and redirect to invitation code entry
+          delete (req.session as any).pendingInvitation;
+          return res.redirect("/complete-invitation");
+        }
+        
+        // Normal login flow
+        return res.redirect("/");
+      });
     })(req, res, next);
   });
 

@@ -112,6 +112,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Validate invitation code for OAuth user (protected)
+  app.post("/api/invitations/validate", isAuthenticated, async (req: any, res) => {
+    try {
+      const validateSchema = z.object({
+        code: z.string().min(1, "Invitation code is required"),
+      });
+
+      const { code } = validateSchema.parse(req.body);
+
+      // Get the current user from session
+      const userId = req.user.claims.sub;
+      
+      // Verify invitation code
+      const invitation = await storage.getInvitationCodeByCode(code);
+      if (!invitation) {
+        return res.status(400).json({ message: "Invalid invitation code" });
+      }
+
+      // Check if code is revoked
+      if (invitation.revokedAt) {
+        return res.status(400).json({ message: "Invitation code has been revoked" });
+      }
+
+      // Check if code is expired
+      if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "Invitation code has expired" });
+      }
+
+      // Check if code has reached max uses
+      if (invitation.currentUses >= invitation.maxUses) {
+        return res.status(400).json({ message: "Invitation code has reached maximum uses" });
+      }
+
+      // Increment invitation code usage
+      await storage.incrementInvitationCodeUsage(invitation.id, userId);
+
+      res.json({ message: "Invitation code validated successfully" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Validation error",
+          errors: error.errors,
+        });
+      }
+      console.error("Error validating invitation code:", error);
+      res.status(500).json({ message: "Failed to validate invitation code" });
+    }
+  });
+
   // Admin: List all users (protected)
   app.get("/api/admin/users", isAuthenticated, async (_req, res) => {
     try {

@@ -1,81 +1,8 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Plane, Users, Calendar, Car } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-
-const invitationSignupSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  invitationCode: z.string().min(1, "Invitation code is required"),
-});
-
-type InvitationSignupForm = z.infer<typeof invitationSignupSchema>;
 
 export default function Landing() {
-  const [isInvitationDialogOpen, setIsInvitationDialogOpen] = useState(false);
-  const { toast } = useToast();
-
-  const form = useForm<InvitationSignupForm>({
-    resolver: zodResolver(invitationSignupSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      invitationCode: "",
-    },
-  });
-
-  const signupMutation = useMutation({
-    mutationFn: async (data: InvitationSignupForm) => {
-      const response = await apiRequest("POST", "/api/invitations/signup", data);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Account created!",
-        description: "Welcome! Redirecting...",
-      });
-      // Reload to refresh auth state
-      setTimeout(() => window.location.reload(), 1000);
-    },
-    onError: (error: any) => {
-      // Extract error message from response
-      let errorMessage = "Failed to create account. Please check your invitation code.";
-      
-      if (error?.message) {
-        // Error message format: "400: {json}" or "400: plain text"
-        try {
-          const match = error.message.match(/\d+:\s*(.+)/);
-          if (match) {
-            const jsonText = match[1];
-            const errorData = JSON.parse(jsonText);
-            errorMessage = errorData.message || errorMessage;
-          }
-        } catch (parseError) {
-          // If JSON parsing fails, use the whole error message
-          errorMessage = error.message;
-        }
-      }
-      
-      toast({
-        title: "Signup failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onSubmit = (data: InvitationSignupForm) => {
-    signupMutation.mutate(data);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
@@ -110,7 +37,7 @@ export default function Landing() {
               variant="outline"
               size="lg"
               className="text-base px-6 py-5"
-              onClick={() => setIsInvitationDialogOpen(true)}
+              onClick={() => window.location.href = '/api/login?invitation=true'}
               data-testid="button-join-invitation"
             >
               Join by Invitation
@@ -168,90 +95,6 @@ export default function Landing() {
           </p>
         </div>
       </div>
-
-      <Dialog open={isInvitationDialogOpen} onOpenChange={setIsInvitationDialogOpen}>
-        <DialogContent data-testid="dialog-invitation-signup">
-          <DialogHeader>
-            <DialogTitle>Join by Invitation</DialogTitle>
-            <DialogDescription>
-              Enter your details and invitation code to create an account.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="John Smith"
-                        {...field}
-                        data-testid="input-invitation-name"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="john@example.com"
-                        {...field}
-                        data-testid="input-invitation-email"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="invitationCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Invitation Code</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="ABC123XYZ"
-                        {...field}
-                        data-testid="input-invitation-code"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="flex gap-3 justify-end pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsInvitationDialogOpen(false)}
-                  data-testid="button-cancel-invitation"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={signupMutation.isPending}
-                  data-testid="button-submit-invitation"
-                >
-                  {signupMutation.isPending ? "Creating Account..." : "Create Account"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
