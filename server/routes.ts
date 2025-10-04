@@ -190,15 +190,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/invitations", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const code = generateInvitationCode();
 
       // Parse request body with defaults
       const requestSchema = z.object({
+        code: z.string().optional(),
         maxUses: z.number().int().positive().optional().default(1),
         expiresInHours: z.number().positive().optional().default(24),
       });
 
-      const { maxUses, expiresInHours } = requestSchema.parse(req.body);
+      const { code: customCode, maxUses, expiresInHours } = requestSchema.parse(req.body);
+
+      // Use custom code or generate random one
+      const code = customCode || generateInvitationCode();
+
+      // Check if code already exists
+      const existingInvitation = await storage.getInvitationCodeByCode(code);
+      if (existingInvitation) {
+        return res.status(400).json({ message: "Invitation code already exists. Please choose a different code." });
+      }
 
       // Calculate expiration date
       const expiresAt = new Date();

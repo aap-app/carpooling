@@ -11,7 +11,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Key, Database, Copy, Trash2, AlertTriangle, Download, Upload, CheckCircle, XCircle, Settings, Plus, X as XIcon } from "lucide-react";
+import { Users, Key, Database, Copy, Trash2, AlertTriangle, Download, Upload, CheckCircle, XCircle, Settings, Plus, X as XIcon, Shuffle, Link as LinkIcon } from "lucide-react";
+import { nanoid } from "nanoid";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { User, InvitationCode, Trip } from "@shared/schema";
@@ -23,6 +24,7 @@ export default function Admin() {
   const [parsedTrips, setParsedTrips] = useState<any[]>([]);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isCreateInviteDialogOpen, setIsCreateInviteDialogOpen] = useState(false);
+  const [customInviteCode, setCustomInviteCode] = useState("");
   const [inviteMaxUses, setInviteMaxUses] = useState(1);
   const [inviteExpiresInHours, setInviteExpiresInHours] = useState(24);
   const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
@@ -150,7 +152,7 @@ export default function Admin() {
 
   // Create invitation with configuration
   const createConfiguredInvitationMutation = useMutation({
-    mutationFn: async (params: { maxUses: number; expiresInHours: number }) => {
+    mutationFn: async (params: { code?: string; maxUses: number; expiresInHours: number }) => {
       const response = await apiRequest("POST", "/api/admin/invitations", params);
       return response.json();
     },
@@ -161,6 +163,7 @@ export default function Admin() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/invitations"] });
       setIsCreateInviteDialogOpen(false);
+      setCustomInviteCode("");
       setInviteMaxUses(1);
       setInviteExpiresInHours(24);
     },
@@ -304,9 +307,27 @@ export default function Admin() {
   };
 
   const createInvitationWithConfig = () => {
+    if (!customInviteCode.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter or generate an invitation code",
+        variant: "destructive",
+      });
+      return;
+    }
     createConfiguredInvitationMutation.mutate({
+      code: customInviteCode.trim(),
       maxUses: inviteMaxUses,
       expiresInHours: inviteExpiresInHours,
+    });
+  };
+
+  const copyInviteUrl = (code: string) => {
+    const url = `${window.location.origin}/invite/${code}`;
+    navigator.clipboard.writeText(url);
+    toast({
+      title: "Copied!",
+      description: "Invitation link copied to clipboard",
     });
   };
 
@@ -457,8 +478,18 @@ export default function Admin() {
                                     size="sm"
                                     onClick={() => copyToClipboard(invitation.code)}
                                     data-testid={`button-copy-${invitation.id}`}
+                                    title="Copy invitation code"
                                   >
                                     <Copy className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => copyInviteUrl(invitation.code)}
+                                    data-testid={`button-copy-url-${invitation.id}`}
+                                    title="Copy invitation link"
+                                  >
+                                    <LinkIcon className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     variant="outline"
@@ -466,6 +497,7 @@ export default function Admin() {
                                     onClick={() => revokeInvitationMutation.mutate(invitation.id)}
                                     disabled={revokeInvitationMutation.isPending}
                                     data-testid={`button-revoke-${invitation.id}`}
+                                    title="Revoke invitation"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -678,6 +710,29 @@ export default function Admin() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="custom-code">Invitation Code</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="custom-code"
+                  value={customInviteCode}
+                  onChange={(e) => setCustomInviteCode(e.target.value.toUpperCase())}
+                  placeholder="Enter custom code or generate random"
+                  data-testid="input-custom-code"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCustomInviteCode(nanoid(8).toUpperCase())}
+                  data-testid="button-generate-code"
+                >
+                  <Shuffle className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Custom code or click the shuffle button to generate a random one
+              </p>
+            </div>
             <div>
               <Label htmlFor="max-uses">Maximum Uses</Label>
               <Input

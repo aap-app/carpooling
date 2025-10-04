@@ -134,9 +134,12 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    // Store invitation flag in session if present
+    // Store invitation flag and code in session if present
     if (req.query.invitation === 'true') {
-      req.session.pendingInvitation = true;
+      (req.session as any).pendingInvitation = true;
+      if (req.query.code) {
+        (req.session as any).invitationCode = req.query.code as string;
+      }
     }
     
     passport.authenticate(`replitauth:${req.hostname}`, {
@@ -162,6 +165,12 @@ export async function setupAuth(app: Express) {
           // Clear the pending flag and set requires invitation flag
           delete (req.session as any).pendingInvitation;
           (req.session as any).requiresInvitationCode = true;
+          
+          // Pass invitation code to complete-invitation page if available
+          const invitationCode = (req.session as any).invitationCode;
+          if (invitationCode) {
+            return res.redirect(`/complete-invitation?code=${encodeURIComponent(invitationCode)}`);
+          }
           return res.redirect("/complete-invitation");
         }
         

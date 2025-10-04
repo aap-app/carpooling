@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,8 +10,18 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 export default function CompleteInvitation() {
+  const search = useSearch();
+  const urlParams = new URLSearchParams(search);
+  const codeFromUrl = urlParams.get("code");
+  
   const [invitationCode, setInvitationCode] = useState("");
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (codeFromUrl) {
+      setInvitationCode(codeFromUrl);
+    }
+  }, [codeFromUrl]);
 
   const validateCodeMutation = useMutation({
     mutationFn: async (code: string) => {

@@ -9,6 +9,7 @@ import ListTrips from "@/pages/list-trips";
 import Admin from "@/pages/admin";
 import Landing from "@/pages/landing";
 import CompleteInvitation from "@/pages/complete-invitation";
+import Invite from "@/pages/invite";
 import Header from "@/components/header";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -28,7 +29,8 @@ function Router() {
 
   return (
     <Switch>
-      {/* Invitation completion route accessible regardless of auth status */}
+      {/* Invitation routes accessible regardless of auth status */}
+      <Route path="/invite/:code" component={Invite} />
       <Route path="/complete-invitation" component={CompleteInvitation} />
       
       {!isAuthenticated ? (
