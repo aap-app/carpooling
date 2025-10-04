@@ -10,6 +10,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   createUser(user: UpsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
+  deleteUser(id: string): Promise<boolean>;
   
   // Trip methods
   getAllTrips(): Promise<Trip[]>;
@@ -119,6 +120,20 @@ export class DbStorage implements IStorage {
       return result;
     } catch (error) {
       console.error("getAllUsers error:", error);
+      throw error;
+    }
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    try {
+      const result = await this.db
+        .delete(users)
+        .where(eq(users.id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error("deleteUser error:", error);
       throw error;
     }
   }

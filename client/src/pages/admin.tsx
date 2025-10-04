@@ -176,6 +176,27 @@ export default function Admin() {
     },
   });
 
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("DELETE", `/api/admin/users/${userId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "User deleted",
+        description: "The user has been deleted successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
@@ -377,6 +398,7 @@ export default function Admin() {
                       <TableHead>Email</TableHead>
                       <TableHead>Auth Method</TableHead>
                       <TableHead>Joined</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -393,6 +415,22 @@ export default function Admin() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {new Date(user.createdAt!).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}? This action cannot be undone.`)) {
+                                deleteUserMutation.mutate(user.id);
+                              }
+                            }}
+                            disabled={deleteUserMutation.isPending || user.id === currentUser?.id}
+                            data-testid={`button-delete-user-${user.id}`}
+                            title={user.id === currentUser?.id ? "Cannot delete your own account" : "Delete user"}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </tr>
                     ))}

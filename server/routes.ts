@@ -175,6 +175,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Delete user (protected)
+  app.delete("/api/admin/users/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const currentUserId = req.user.claims.sub;
+      const targetUserId = req.params.id;
+
+      // Prevent users from deleting themselves
+      if (currentUserId === targetUserId) {
+        return res.status(403).json({ message: "You cannot delete your own account" });
+      }
+
+      const deleted = await storage.deleteUser(targetUserId);
+      if (!deleted) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
   // Admin: List all invitation codes (protected)
   app.get("/api/admin/invitations", isAuthenticated, async (_req, res) => {
     try {
