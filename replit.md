@@ -176,15 +176,20 @@ Implemented a comprehensive admin/owner privilege system with user ID 48270256 a
 - **User Response**: `/api/auth/user` endpoint now includes `isAdmin: boolean` field for all users
 
 **Admin Privileges & Restrictions:**
-- **Protected Routes**: All admin endpoints (`/api/admin/*`) now require admin privileges via `requireAdmin` middleware:
-  - User management (list, delete)
-  - Invitation code management (list, create, revoke)
-  - OAuth settings (view, update)
+- **Admin-Only Routes** (require `requireAdmin` middleware):
+  - DELETE /api/admin/users/:id - Delete users
+  - DELETE /api/admin/invitations/:id - Revoke invitation codes
+  - GET /api/admin/settings/oauth - View OAuth settings
+  - PUT /api/admin/settings/oauth - Update OAuth settings
+- **All Authenticated Users** can access:
+  - GET /api/admin/users - List all users
+  - GET /api/admin/invitations - List invitation codes
+  - POST /api/admin/invitations - Create invitation codes
 - **Admin User Protection**: Admin user (ID: 48270256) cannot be deleted by anyone, enforced at backend
 - **Frontend Access Control**:
   - Delete user buttons only visible to admin users
   - OAuth Settings tab only visible to admin users
-  - Admin-only queries conditionally enabled based on `isAdmin` flag to prevent unnecessary 403 errors
+  - All authenticated users can view users and manage invitation codes
 
 **Security Features:**
 - Non-admin users receive 403 "Admin privileges required" when attempting to access admin endpoints
