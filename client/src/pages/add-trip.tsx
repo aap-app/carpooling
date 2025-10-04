@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Calendar, Clock, Plane, CheckCircle, Search, Users, Shield, RotateCcw, NotebookPen, X } from "lucide-react";
+import { User, Calendar, Clock, Plane, Car, Search, Users, Ban, Shield, RotateCcw, NotebookPen, X } from "lucide-react";
 import type { Trip } from "@shared/schema";
 
 export default function AddTrip() {
@@ -251,11 +251,12 @@ export default function AddTrip() {
                 <Label className="text-sm font-medium text-foreground">
                   Car Status <span className="text-destructive">*</span>
                 </Label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                   {[
-                    { value: "booked", icon: CheckCircle, label: "Booked", subtitle: "Car secured", color: "accent" },
+                    { value: "booked", icon: Car, label: "Booked", subtitle: "Car secured", color: "accent" },
                     { value: "looking", icon: Search, label: "Looking", subtitle: "Need a ride", color: "warning" },
-                    { value: "sharing", icon: Users, label: "Sharing", subtitle: "Have a ride", color: "secondary" }
+                    { value: "sharing", icon: Users, label: "Found", subtitle: "Have a ride", color: "secondary" },
+                    { value: "full", icon: Ban, label: "Full", subtitle: "Car is full", color: "destructive" }
                   ].map(({ value, icon: Icon, label, subtitle, color }) => (
                     <Label 
                       key={value}

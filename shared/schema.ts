@@ -77,7 +77,7 @@ export const trips = pgTable("trips", {
   flightDate: text("flight_date").notNull(), // Store as ISO date string
   flightTime: text("flight_time").notNull(), // Store as HH:MM format
   flightNumber: text("flight_number").notNull(),
-  carStatus: text("car_status").notNull(), // 'booked' | 'looking' | 'sharing'
+  carStatus: text("car_status").notNull(), // 'booked' | 'looking' | 'sharing' | 'full'
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -88,7 +88,7 @@ export const insertTripSchema = createInsertSchema(trips).omit({
   flightDate: z.string().min(1, "Flight date is required"),
   flightTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
   flightNumber: z.string().min(1, "Flight number is required").transform(val => val.toUpperCase()),
-  carStatus: z.enum(["booked", "looking", "sharing"]),
+  carStatus: z.enum(["booked", "looking", "sharing", "full"]),
   name: z.string().min(1, "Name is required"),
 });
 

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plane, CheckCircle, Search, Users, Filter, Layers, Calendar, Clock, Edit } from "lucide-react";
+import { Plane, Car, Search, Users, Ban, Filter, Layers, Calendar, Clock, Edit } from "lucide-react";
 
 export default function ListTrips() {
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
@@ -27,6 +27,7 @@ export default function ListTrips() {
       booked: trips.filter(t => t.carStatus === "booked").length,
       looking: trips.filter(t => t.carStatus === "looking").length,
       sharing: trips.filter(t => t.carStatus === "sharing").length,
+      full: trips.filter(t => t.carStatus === "full").length,
     };
   }, [trips]);
 
@@ -124,12 +125,13 @@ export default function ListTrips() {
 
   const getStatusBadge = (status: string) => {
     const config = {
-      booked: { icon: CheckCircle, className: "bg-accent/10 text-accent", label: "Booked" },
+      booked: { icon: Car, className: "bg-accent/10 text-accent", label: "Booked" },
       looking: { icon: Search, className: "bg-warning/10 text-warning", label: "Looking" },
-      sharing: { icon: Users, className: "bg-secondary/10 text-secondary", label: "Sharing" }
+      sharing: { icon: Users, className: "bg-secondary/10 text-secondary", label: "Found" },
+      full: { icon: Ban, className: "bg-destructive/10 text-destructive", label: "Full" }
     };
     
-    const { icon: Icon, className, label } = config[status as keyof typeof config];
+    const { icon: Icon, className, label } = config[status as keyof typeof config] || config.looking;
     
     return (
       <Badge className={`${className} border-0`} data-testid={`badge-status-${status}`}>
@@ -187,7 +189,7 @@ export default function ListTrips() {
                 <p className="text-2xl font-bold mt-1" data-testid="stat-booked">{statusCounts.booked}</p>
               </div>
               <div className="bg-accent/10 rounded-full p-3">
-                <CheckCircle className="text-accent text-xl" />
+                <Car className="text-accent text-xl" />
               </div>
             </div>
           </CardContent>
@@ -211,7 +213,7 @@ export default function ListTrips() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Sharing Rides</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Found Rides</p>
                 <p className="text-2xl font-bold mt-1" data-testid="stat-sharing">{statusCounts.sharing}</p>
               </div>
               <div className="bg-secondary/10 rounded-full p-3">
@@ -258,7 +260,8 @@ export default function ListTrips() {
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="booked">Booked</SelectItem>
                     <SelectItem value="looking">Looking</SelectItem>
-                    <SelectItem value="sharing">Sharing</SelectItem>
+                    <SelectItem value="sharing">Found</SelectItem>
+                    <SelectItem value="full">Full</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

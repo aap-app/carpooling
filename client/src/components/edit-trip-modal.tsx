@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle, Search, Users, Save, Trash2 } from "lucide-react";
+import { Car, Search, Users, Ban, Save, Trash2 } from "lucide-react";
 
 interface EditTripModalProps {
   trip: Trip | null;
@@ -33,7 +33,7 @@ export default function EditTripModal({ trip, isOpen, onClose }: EditTripModalPr
       flightDate: "",
       flightTime: "",
       flightNumber: "",
-      carStatus: "looking" as const,
+      carStatus: "looking",
     },
   });
 
@@ -45,7 +45,7 @@ export default function EditTripModal({ trip, isOpen, onClose }: EditTripModalPr
         flightDate: trip.flightDate,
         flightTime: trip.flightTime,
         flightNumber: trip.flightNumber,
-        carStatus: trip.carStatus as "booked" | "looking" | "sharing",
+        carStatus: trip.carStatus as "booked" | "looking" | "sharing" | "full",
       });
     }
   }, [trip, form]);
@@ -167,11 +167,12 @@ export default function EditTripModal({ trip, isOpen, onClose }: EditTripModalPr
           
           <div className="space-y-2">
             <Label>Car Status</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { value: "booked", icon: CheckCircle, label: "Booked", color: "accent" },
+                { value: "booked", icon: Car, label: "Booked", color: "accent" },
                 { value: "looking", icon: Search, label: "Looking", color: "warning" },
-                { value: "sharing", icon: Users, label: "Sharing", color: "secondary" }
+                { value: "sharing", icon: Users, label: "Found", color: "secondary" },
+                { value: "full", icon: Ban, label: "Full", color: "destructive" }
               ].map(({ value, icon: Icon, label, color }) => (
                 <Label 
                   key={value}
@@ -184,8 +185,8 @@ export default function EditTripModal({ trip, isOpen, onClose }: EditTripModalPr
                     className="sr-only"
                     data-testid={`radio-edit-car-status-${value}`}
                   />
-                  <div className="text-center">
-                    <Icon className={`text-${color} text-lg mb-1`} />
+                  <div className="flex flex-col items-center">
+                    <Icon className={`text-${color} h-5 w-5 mb-1`} />
                     <div className="text-xs font-medium">{label}</div>
                   </div>
                 </Label>
