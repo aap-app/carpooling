@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { type Trip } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
 import EditTripModal from "@/components/edit-trip-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,8 @@ export default function ListTrips() {
   const [sortBy, setSortBy] = useState("date-asc");
   const [filterStatus, setFilterStatus] = useState("all");
   const [groupedView, setGroupedView] = useState(false);
+  const [nearbyFilter, setNearbyFilter] = useState<string>("off");
+  const { user } = useAuth();
 
   const { data: trips = [], isLoading } = useQuery<Trip[]>({
     queryKey: ["/api/trips"],
@@ -35,6 +38,34 @@ export default function ListTrips() {
       filtered = filtered.filter(trip => trip.carStatus === filterStatus);
     }
 
+    // Filter by nearby flights
+    if (nearbyFilter !== "off" && user) {
+      const userName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+      
+      // Find user's flights
+      const userTrips = filtered.filter(trip => trip.name === userName);
+      
+      if (userTrips.length > 0) {
+        const minutesRange = parseInt(nearbyFilter);
+        
+        // Get all flights within time range of user's flights
+        const nearbyTrips = filtered.filter(trip => {
+          // Always include user's own trips
+          if (trip.name === userName) return true;
+          
+          // Check if this trip is within range of any of user's trips
+          return userTrips.some(userTrip => {
+            const userDateTime = new Date(`${userTrip.flightDate}T${userTrip.flightTime}`).getTime();
+            const tripDateTime = new Date(`${trip.flightDate}T${trip.flightTime}`).getTime();
+            const diffMinutes = Math.abs(tripDateTime - userDateTime) / (1000 * 60);
+            return diffMinutes <= minutesRange;
+          });
+        });
+        
+        filtered = nearbyTrips;
+      }
+    }
+
     // Sort
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
@@ -49,11 +80,12 @@ export default function ListTrips() {
     });
 
     return sorted;
-  }, [trips, sortBy, filterStatus]);
+  }, [trips, sortBy, filterStatus, nearbyFilter, user]);
 
   const groupedTrips = useMemo(() => {
     const groups = filteredAndSortedTrips.reduce((acc, trip) => {
-      const key = trip.flightNumber;
+      // Group by flight number AND date/time
+      const key = `${trip.flightNumber}|${trip.flightDate}|${trip.flightTime}`;
       if (!acc[key]) {
         acc[key] = [];
       }
@@ -61,13 +93,17 @@ export default function ListTrips() {
       return acc;
     }, {} as Record<string, Trip[]>);
 
-    return Object.entries(groups).map(([flightNumber, trips]) => ({
-      flightNumber,
-      trips,
-      date: trips[0]?.flightDate,
-      time: trips[0]?.flightTime,
-      count: trips.length,
-    }));
+    return Object.entries(groups).map(([key, trips]) => {
+      const [flightNumber, date, time] = key.split('|');
+      return {
+        flightNumber,
+        date,
+        time,
+        trips,
+        count: trips.length,
+        key,
+      };
+    });
   }, [filteredAndSortedTrips]);
 
   const formatDate = (dateStr: string) => {
@@ -226,6 +262,22 @@ export default function ListTrips() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Nearby Flights Filter */}
+              <div className="flex items-center space-x-2">
+                <label className="text-xs text-muted-foreground">Nearby:</label>
+                <Select value={nearbyFilter} onValueChange={setNearbyFilter}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="select-nearby">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="off">Off</SelectItem>
+                    <SelectItem value="30">Within 30 min</SelectItem>
+                    <SelectItem value="60">Within 1 hour</SelectItem>
+                    <SelectItem value="180">Within 3 hours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               
               {/* Group by Flight */}
               <Button 
@@ -367,14 +419,14 @@ export default function ListTrips() {
             
             <div className="space-y-3">
               {groupedTrips.map((group) => (
-                <div key={group.flightNumber} className="bg-muted/30 rounded-lg p-4 border border-border" data-testid={`group-${group.flightNumber}`}>
+                <div key={group.key} className="bg-muted/30 rounded-lg p-4 border border-border" data-testid={`group-${group.key}`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
                       <Badge className="bg-primary/10 text-primary font-mono font-medium">
                         {group.flightNumber}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {formatDate(group.date!)} • {formatTime(group.time!)}
+                        {formatDate(group.date)} • {formatTime(group.time)}
                       </span>
                     </div>
                     <span className="text-xs font-medium text-foreground">
