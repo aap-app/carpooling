@@ -1,19 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertTripSchema, type InsertTrip } from "@shared/schema";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { User, Calendar, Clock, Plane, CheckCircle, Search, Users, Shield, RotateCcw, NotebookPen, X } from "lucide-react";
+import type { Trip } from "@shared/schema";
 
 export default function AddTrip() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [flightNumberInput, setFlightNumberInput] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Fetch all trips to get flight number suggestions
+  const { data: trips = [] } = useQuery<Trip[]>({
+    queryKey: ["/api/trips"],
+  });
 
   const form = useForm<InsertTrip>({
     resolver: zodResolver(insertTripSchema),
@@ -25,6 +35,57 @@ export default function AddTrip() {
       carStatus: "looking" as const,
     },
   });
+
+  // Prefill name with user's name when component mounts
+  useEffect(() => {
+    if (user?.firstName || user?.lastName) {
+      const userName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+      form.setValue("name", userName);
+    }
+  }, [user, form]);
+
+  // Get smart sorted flight number suggestions
+  const getFlightSuggestions = (input: string): string[] => {
+    if (!input || input.length < 2) return [];
+    
+    const inputUpper = input.toUpperCase();
+    const uniqueFlights = Array.from(new Set(trips.map(t => t.flightNumber.toUpperCase())));
+    
+    // Categorize flights
+    const startsWith: string[] = [];
+    const endsWith: string[] = [];
+    const contains: string[] = [];
+    
+    uniqueFlights.forEach(flight => {
+      if (flight === inputUpper) return; // Skip exact matches
+      
+      if (flight.startsWith(inputUpper)) {
+        startsWith.push(flight);
+      } else if (flight.endsWith(inputUpper)) {
+        endsWith.push(flight);
+      } else if (flight.includes(inputUpper)) {
+        contains.push(flight);
+      }
+    });
+    
+    // Take max 3 from each category, max 7 total
+    const suggestions: string[] = [];
+    suggestions.push(...startsWith.slice(0, 3));
+    
+    const remaining = 7 - suggestions.length;
+    if (remaining > 0) {
+      suggestions.push(...endsWith.slice(0, Math.min(3, remaining)));
+    }
+    
+    const remaining2 = 7 - suggestions.length;
+    if (remaining2 > 0) {
+      suggestions.push(...contains.slice(0, Math.min(3, remaining2)));
+    }
+    
+    return suggestions;
+  };
+
+  const flightSuggestions = getFlightSuggestions(flightNumberInput);
 
   const createTripMutation = useMutation({
     mutationFn: async (data: InsertTrip) => {
@@ -149,7 +210,35 @@ export default function AddTrip() {
                     className="pl-10 uppercase" 
                     placeholder="e.g., AA1234"
                     data-testid="input-flight-number"
+                    value={flightNumberInput}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase();
+                      setFlightNumberInput(value);
+                      form.setValue("flightNumber", value);
+                      setShowSuggestions(value.length >= 2);
+                    }}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                    onFocus={() => setShowSuggestions(flightNumberInput.length >= 2)}
                   />
+                  {showSuggestions && flightSuggestions.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-48 overflow-auto">
+                      {flightSuggestions.map((flight, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          className="w-full px-4 py-2 text-left hover:bg-accent hover:text-accent-foreground transition-colors"
+                          onClick={() => {
+                            setFlightNumberInput(flight);
+                            form.setValue("flightNumber", flight);
+                            setShowSuggestions(false);
+                          }}
+                          data-testid={`suggestion-flight-${index}`}
+                        >
+                          {flight}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {form.formState.errors.flightNumber && (
                   <p className="text-xs text-destructive">{form.formState.errors.flightNumber.message}</p>
