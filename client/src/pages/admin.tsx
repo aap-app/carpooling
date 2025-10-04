@@ -32,16 +32,14 @@ export default function Admin() {
   const [newDomain, setNewDomain] = useState("");
   const [newOrg, setNewOrg] = useState("");
 
-  // Fetch all users (admin only)
+  // Fetch all users (all authenticated users)
   const { data: users = [], isLoading: usersLoading } = useQuery<UserWithAdmin[]>({
     queryKey: ["/api/admin/users"],
-    enabled: currentUser?.isAdmin ?? false,
   });
 
-  // Fetch all invitation codes (admin only)
+  // Fetch all invitation codes (all authenticated users)
   const { data: invitations = [], isLoading: invitationsLoading } = useQuery<InvitationCode[]>({
     queryKey: ["/api/admin/invitations"],
-    enabled: currentUser?.isAdmin ?? false,
   });
 
   // Fetch all trips for CSV export

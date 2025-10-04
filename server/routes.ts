@@ -175,8 +175,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: List all users (admin only)
-  app.get("/api/admin/users", isAuthenticated, requireAdmin, async (_req, res) => {
+  // Admin: List all users (authenticated users)
+  app.get("/api/admin/users", isAuthenticated, async (_req, res) => {
     try {
       const users = await storage.getAllUsers();
       // Add isAdmin flag to each user
@@ -218,8 +218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: List all invitation codes (admin only)
-  app.get("/api/admin/invitations", isAuthenticated, requireAdmin, async (_req, res) => {
+  // Admin: List all invitation codes (authenticated users)
+  app.get("/api/admin/invitations", isAuthenticated, async (_req, res) => {
     try {
       const invitations = await storage.getAllInvitationCodes();
       res.json(invitations);
@@ -229,8 +229,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: Create new invitation code (admin only)
-  app.post("/api/admin/invitations", isAuthenticated, requireAdmin, async (req: any, res) => {
+  // Admin: Create new invitation code (authenticated users)
+  app.post("/api/admin/invitations", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
 
