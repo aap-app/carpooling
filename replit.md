@@ -167,6 +167,36 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
+### Admin/Owner System (October 4, 2025)
+Implemented a comprehensive admin/owner privilege system with user ID 48270256 as the designated owner:
+
+**Admin Configuration:**
+- **Environment Variable**: `ADMIN_USER_ID` defines the admin user (defaults to "48270256")
+- **Backend Helper**: New `server/admin.ts` module with `isAdmin()` check and `requireAdmin` middleware
+- **User Response**: `/api/auth/user` endpoint now includes `isAdmin: boolean` field for all users
+
+**Admin Privileges & Restrictions:**
+- **Protected Routes**: All admin endpoints (`/api/admin/*`) now require admin privileges via `requireAdmin` middleware:
+  - User management (list, delete)
+  - Invitation code management (list, create, revoke)
+  - OAuth settings (view, update)
+- **Admin User Protection**: Admin user (ID: 48270256) cannot be deleted by anyone, enforced at backend
+- **Frontend Access Control**:
+  - Delete user buttons only visible to admin users
+  - OAuth Settings tab only visible to admin users
+  - Admin-only queries conditionally enabled based on `isAdmin` flag to prevent unnecessary 403 errors
+
+**Security Features:**
+- Non-admin users receive 403 "Admin privileges required" when attempting to access admin endpoints
+- Admin user deletion attempts return 403 "Cannot delete the admin user"
+- Self-deletion protection maintained (users cannot delete themselves)
+- React Query optimizations prevent non-admins from triggering admin-only API calls
+
+**Type System:**
+- New `UserWithAdmin` type extends `User` with `isAdmin: boolean` field
+- Frontend components properly typed to consume admin flag
+- Backend returns `isAdmin` for individual user lookups and user lists
+
 ### OAuth Access Controls & Enhanced Invitations (October 3, 2025)
 Implemented OAuth access restrictions and enhanced invitation code system:
 
