@@ -5,6 +5,7 @@ import { insertTripSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { nanoid } from "nanoid";
+import { isAdmin, requireAdmin } from "./admin";
 
 // Helper to generate random invitation code
 function generateInvitationCode(): string {
@@ -26,7 +27,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      res.json(user || null);
+      if (!user) {
+        return res.json(null);
+      }
+      
+      // Add isAdmin flag to user response
+      const userWithAdmin = {
+        ...user,
+        isAdmin: isAdmin(userId)
+      };
+      
+      res.json(userWithAdmin);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });

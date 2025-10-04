@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 
+export type UserWithAdmin = User & { isAdmin: boolean };
+
 export function useAuth() {
-  const { data: user, isLoading } = useQuery<User | null>({
+  const { data: user, isLoading } = useQuery<UserWithAdmin | null>({
     queryKey: ["/api/auth/user"],
     retry: false,
     retryOnMount: false,
