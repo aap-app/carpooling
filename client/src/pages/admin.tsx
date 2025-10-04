@@ -14,8 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Key, Database, Copy, Trash2, AlertTriangle, Download, Upload, CheckCircle, XCircle, Settings, Plus, X as XIcon, Shuffle, Link as LinkIcon } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import type { User, InvitationCode, Trip } from "@shared/schema";
+import { useAuth, type UserWithAdmin } from "@/hooks/useAuth";
+import type { InvitationCode, Trip } from "@shared/schema";
 
 export default function Admin() {
   const { toast } = useToast();
@@ -33,7 +33,7 @@ export default function Admin() {
   const [newOrg, setNewOrg] = useState("");
 
   // Fetch all users
-  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+  const { data: users = [], isLoading: usersLoading } = useQuery<UserWithAdmin[]>({
     queryKey: ["/api/admin/users"],
   });
 
@@ -369,10 +369,12 @@ export default function Admin() {
             <Key className="h-4 w-4 mr-2" />
             Invitations
           </TabsTrigger>
-          <TabsTrigger value="oauth" data-testid="tab-oauth">
-            <Settings className="h-4 w-4 mr-2" />
-            OAuth Settings
-          </TabsTrigger>
+          {currentUser?.isAdmin && (
+            <TabsTrigger value="oauth" data-testid="tab-oauth">
+              <Settings className="h-4 w-4 mr-2" />
+              OAuth Settings
+            </TabsTrigger>
+          )}
           <TabsTrigger value="data" data-testid="tab-data">
             <Database className="h-4 w-4 mr-2" />
             Data
@@ -417,20 +419,28 @@ export default function Admin() {
                           {new Date(user.createdAt!).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}? This action cannot be undone.`)) {
-                                deleteUserMutation.mutate(user.id);
+                          {currentUser?.isAdmin && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (window.confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}? This action cannot be undone.`)) {
+                                  deleteUserMutation.mutate(user.id);
+                                }
+                              }}
+                              disabled={deleteUserMutation.isPending || user.id === currentUser?.id || user.isAdmin}
+                              data-testid={`button-delete-user-${user.id}`}
+                              title={
+                                user.isAdmin 
+                                  ? "Cannot delete admin user" 
+                                  : user.id === currentUser?.id 
+                                    ? "Cannot delete your own account" 
+                                    : "Delete user"
                               }
-                            }}
-                            disabled={deleteUserMutation.isPending || user.id === currentUser?.id}
-                            data-testid={`button-delete-user-${user.id}`}
-                            title={user.id === currentUser?.id ? "Cannot delete your own account" : "Delete user"}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </tr>
                     ))}

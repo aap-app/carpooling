@@ -175,19 +175,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: List all users (protected)
-  app.get("/api/admin/users", isAuthenticated, async (_req, res) => {
+  // Admin: List all users (admin only)
+  app.get("/api/admin/users", isAuthenticated, requireAdmin, async (_req, res) => {
     try {
       const users = await storage.getAllUsers();
-      res.json(users);
+      // Add isAdmin flag to each user
+      const usersWithAdmin = users.map(user => ({
+        ...user,
+        isAdmin: isAdmin(user.id)
+      }));
+      res.json(usersWithAdmin);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
     }
   });
 
-  // Admin: Delete user (protected)
-  app.delete("/api/admin/users/:id", isAuthenticated, async (req: any, res) => {
+  // Admin: Delete user (admin only)
+  app.delete("/api/admin/users/:id", isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const currentUserId = req.user.claims.sub;
       const targetUserId = req.params.id;
@@ -195,6 +200,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Prevent users from deleting themselves
       if (currentUserId === targetUserId) {
         return res.status(403).json({ message: "You cannot delete your own account" });
+      }
+
+      // Prevent deletion of admin user
+      if (isAdmin(targetUserId)) {
+        return res.status(403).json({ message: "Cannot delete the admin user" });
       }
 
       const deleted = await storage.deleteUser(targetUserId);
@@ -208,8 +218,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: List all invitation codes (protected)
-  app.get("/api/admin/invitations", isAuthenticated, async (_req, res) => {
+  // Admin: List all invitation codes (admin only)
+  app.get("/api/admin/invitations", isAuthenticated, requireAdmin, async (_req, res) => {
     try {
       const invitations = await storage.getAllInvitationCodes();
       res.json(invitations);
@@ -219,8 +229,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: Create new invitation code (protected)
-  app.post("/api/admin/invitations", isAuthenticated, async (req: any, res) => {
+  // Admin: Create new invitation code (admin only)
+  app.post("/api/admin/invitations", isAuthenticated, requireAdmin, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
 
@@ -266,8 +276,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: Revoke invitation code (protected)
-  app.delete("/api/admin/invitations/:id", isAuthenticated, async (req, res) => {
+  // Admin: Revoke invitation code (admin only)
+  app.delete("/api/admin/invitations/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const invitation = await storage.revokeInvitationCode(req.params.id);
       if (!invitation) {
@@ -280,8 +290,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: Get OAuth settings (protected)
-  app.get("/api/admin/settings/oauth", isAuthenticated, async (_req, res) => {
+  // Admin: Get OAuth settings (admin only)
+  app.get("/api/admin/settings/oauth", isAuthenticated, requireAdmin, async (_req, res) => {
     try {
       const setting = await storage.getSetting("oauth_restrictions");
       const restrictions = setting?.value || {
@@ -295,8 +305,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin: Update OAuth settings (protected)
-  app.put("/api/admin/settings/oauth", isAuthenticated, async (req, res) => {
+  // Admin: Update OAuth settings (admin only)
+  app.put("/api/admin/settings/oauth", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const settingsSchema = z.object({
         allowedDomains: z.array(z.string()).optional().default([]),
