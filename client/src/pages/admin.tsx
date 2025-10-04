@@ -32,14 +32,16 @@ export default function Admin() {
   const [newDomain, setNewDomain] = useState("");
   const [newOrg, setNewOrg] = useState("");
 
-  // Fetch all users
+  // Fetch all users (admin only)
   const { data: users = [], isLoading: usersLoading } = useQuery<UserWithAdmin[]>({
     queryKey: ["/api/admin/users"],
+    enabled: currentUser?.isAdmin ?? false,
   });
 
-  // Fetch all invitation codes
+  // Fetch all invitation codes (admin only)
   const { data: invitations = [], isLoading: invitationsLoading } = useQuery<InvitationCode[]>({
     queryKey: ["/api/admin/invitations"],
+    enabled: currentUser?.isAdmin ?? false,
   });
 
   // Fetch all trips for CSV export
@@ -115,9 +117,10 @@ export default function Admin() {
     },
   });
 
-  // Fetch OAuth settings
+  // Fetch OAuth settings (admin only)
   const { data: oauthSettings } = useQuery<{ allowedDomains: string[]; allowedGitHubOrgs: string[] }>({
     queryKey: ["/api/admin/settings/oauth"],
+    enabled: currentUser?.isAdmin ?? false,
   });
 
   // Update local state when OAuth settings are loaded
