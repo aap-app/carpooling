@@ -339,6 +339,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export trips as CSV (protected) - MUST be before /api/trips/:id
+  app.get("/api/trips/export", isAuthenticated, async (_req, res) => {
+    try {
+      const trips = await storage.getAllTrips();
+      
+      // Helper function to escape CSV values per RFC 4180
+      const escapeCSV = (value: string): string => {
+        // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+        if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      };
+      
+      // Create CSV content with proper escaping
+      const headers = ["Name", "Flight Date", "Flight Time", "Flight Number", "Car Status"];
+      const rows = trips.map(trip => [
+        escapeCSV(trip.name),
+        escapeCSV(trip.flightDate),
+        escapeCSV(trip.flightTime),
+        escapeCSV(trip.flightNumber),
+        escapeCSV(trip.carStatus)
+      ]);
+      
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.join(","))
+      ].join("\n");
+      
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", "attachment; filename=airport-carpool.csv");
+      res.send(csvContent);
+    } catch (error) {
+      console.error("Error exporting trips:", error);
+      res.status(500).json({ message: "Failed to export trips" });
+    }
+  });
+
   // Get trip by ID (protected)
   app.get("/api/trips/:id", isAuthenticated, async (req, res) => {
     try {
@@ -400,44 +438,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Trip deleted successfully" });
     } catch (error) {
       res.status(500).json({ message: "Failed to delete trip" });
-    }
-  });
-
-  // Export trips as CSV (protected)
-  app.get("/api/trips/export", isAuthenticated, async (_req, res) => {
-    try {
-      const trips = await storage.getAllTrips();
-      
-      // Helper function to escape CSV values per RFC 4180
-      const escapeCSV = (value: string): string => {
-        // If value contains comma, quote, or newline, wrap in quotes and escape quotes
-        if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        return value;
-      };
-      
-      // Create CSV content with proper escaping
-      const headers = ["Name", "Flight Date", "Flight Time", "Flight Number", "Car Status"];
-      const rows = trips.map(trip => [
-        escapeCSV(trip.name),
-        escapeCSV(trip.flightDate),
-        escapeCSV(trip.flightTime),
-        escapeCSV(trip.flightNumber),
-        escapeCSV(trip.carStatus)
-      ]);
-      
-      const csvContent = [
-        headers.join(","),
-        ...rows.map(row => row.join(","))
-      ].join("\n");
-      
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", "attachment; filename=airport-carpool.csv");
-      res.send(csvContent);
-    } catch (error) {
-      console.error("Error exporting trips:", error);
-      res.status(500).json({ message: "Failed to export trips" });
     }
   });
 
