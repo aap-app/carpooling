@@ -57,12 +57,25 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
+  // Google OAuth uses 'given_name' and 'family_name', while some providers use 'first_name' and 'last_name'
+  // Also try 'name' as a fallback if individual name fields aren't available
+  const firstName = claims["first_name"] || claims["given_name"] || claims["name"]?.split(" ")[0] || "";
+  const lastName = claims["last_name"] || claims["family_name"] || claims["name"]?.split(" ").slice(1).join(" ") || "";
+  
+  console.log("Upserting user with claims:", {
+    sub: claims["sub"],
+    email: claims["email"],
+    firstName,
+    lastName,
+    availableClaims: Object.keys(claims)
+  });
+  
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
+    firstName,
+    lastName,
+    profileImageUrl: claims["profile_image_url"] || claims["picture"],
   });
 }
 
