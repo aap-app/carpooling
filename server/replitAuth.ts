@@ -148,6 +148,9 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    console.log("LOGIN - Query params:", req.query);
+    console.log("LOGIN - Session ID:", req.sessionID);
+    
     // Store invitation flag and code in session if present
     if (req.query.invitation === 'true') {
       (req.session as any).pendingInvitation = true;
@@ -155,12 +158,18 @@ export async function setupAuth(app: Express) {
         (req.session as any).invitationCode = req.query.code as string;
       }
       
+      console.log("LOGIN - Setting invitation flags:", {
+        pendingInvitation: (req.session as any).pendingInvitation,
+        invitationCode: (req.session as any).invitationCode
+      });
+      
       // Save session before OAuth redirect to ensure data persists
       req.session.save((err) => {
         if (err) {
-          console.error("Session save error:", err);
+          console.error("LOGIN - Session save error:", err);
           return next(err);
         }
+        console.log("LOGIN - Session saved successfully, redirecting to OAuth");
         passport.authenticate(`replitauth:${req.hostname}`, {
           prompt: "login consent",
           scope: ["openid", "email", "profile", "offline_access"],
@@ -176,29 +185,46 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
+    console.log("CALLBACK - Session ID:", req.sessionID);
+    console.log("CALLBACK - Session data:", {
+      pendingInvitation: (req.session as any).pendingInvitation,
+      invitationCode: (req.session as any).invitationCode,
+      requiresInvitationCode: (req.session as any).requiresInvitationCode
+    });
+    
     passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any) => {
       if (err || !user) {
+        console.error("CALLBACK - Auth error:", err);
         return res.redirect("/api/login");
       }
       
       req.logIn(user, (loginErr) => {
         if (loginErr) {
+          console.error("CALLBACK - Login error:", loginErr);
           return next(loginErr);
         }
         
+        console.log("CALLBACK - User logged in successfully");
+        
         // Check if this was an invitation-based signup
         const pendingInvitation = (req.session as any).pendingInvitation;
+        console.log("CALLBACK - Checking pendingInvitation:", pendingInvitation);
+        
         if (pendingInvitation) {
           // Clear the pending flag and set requires invitation flag
           delete (req.session as any).pendingInvitation;
           (req.session as any).requiresInvitationCode = true;
           
+          console.log("CALLBACK - Setting requiresInvitationCode, saving session");
+          
           // Save session before redirect to ensure flags persist
           req.session.save((saveErr) => {
             if (saveErr) {
-              console.error("Session save error in callback:", saveErr);
+              console.error("CALLBACK - Session save error:", saveErr);
               return next(saveErr);
             }
+            
+            console.log("CALLBACK - Session saved, redirecting to complete-invitation");
             
             // Pass invitation code to complete-invitation page if available
             const invitationCode = (req.session as any).invitationCode;
@@ -209,6 +235,7 @@ export async function setupAuth(app: Express) {
           });
         } else {
           // Normal login flow
+          console.log("CALLBACK - Normal login, redirecting to /");
           return res.redirect("/");
         }
       });
@@ -230,7 +257,13 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  console.log("AUTH CHECK - Path:", req.path, "Method:", req.method);
+  console.log("AUTH CHECK - Is authenticated:", req.isAuthenticated());
+  console.log("AUTH CHECK - User exists:", !!user);
+  console.log("AUTH CHECK - Has expires_at:", !!user?.expires_at);
+
+  if (!req.isAuthenticated() || !user?.expires_at) {
+    console.log("AUTH CHECK - FAILED: Not authenticated or no expires_at");
     return res.status(401).json({ message: "Unauthorized" });
   }
 
@@ -239,7 +272,11 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const pendingInvitation = (req.session as any).requiresInvitationCode;
   const isValidationEndpoint = req.path === "/api/invitations/validate" && req.method === "POST";
   
+  console.log("AUTH CHECK - requiresInvitationCode:", pendingInvitation);
+  console.log("AUTH CHECK - isValidationEndpoint:", isValidationEndpoint);
+  
   if (pendingInvitation && !isValidationEndpoint) {
+    console.log("AUTH CHECK - BLOCKED: Invitation code required");
     return res.status(403).json({ 
       message: "Invitation code required",
       requiresInvitationCode: true 
