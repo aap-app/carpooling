@@ -140,12 +140,25 @@ export async function setupAuth(app: Express) {
       if (req.query.code) {
         (req.session as any).invitationCode = req.query.code as string;
       }
+      
+      // Save session before OAuth redirect to ensure data persists
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return next(err);
+        }
+        passport.authenticate(`replitauth:${req.hostname}`, {
+          prompt: "login consent",
+          scope: ["openid", "email", "profile", "offline_access"],
+        })(req, res, next);
+      });
+    } else {
+      // No invitation, proceed directly with auth
+      passport.authenticate(`replitauth:${req.hostname}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
     }
-    
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
