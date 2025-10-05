@@ -179,16 +179,24 @@ export async function setupAuth(app: Express) {
           delete (req.session as any).pendingInvitation;
           (req.session as any).requiresInvitationCode = true;
           
-          // Pass invitation code to complete-invitation page if available
-          const invitationCode = (req.session as any).invitationCode;
-          if (invitationCode) {
-            return res.redirect(`/complete-invitation?code=${encodeURIComponent(invitationCode)}`);
-          }
-          return res.redirect("/complete-invitation");
+          // Save session before redirect to ensure flags persist
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error("Session save error in callback:", saveErr);
+              return next(saveErr);
+            }
+            
+            // Pass invitation code to complete-invitation page if available
+            const invitationCode = (req.session as any).invitationCode;
+            if (invitationCode) {
+              return res.redirect(`/complete-invitation?code=${encodeURIComponent(invitationCode)}`);
+            }
+            return res.redirect("/complete-invitation");
+          });
+        } else {
+          // Normal login flow
+          return res.redirect("/");
         }
-        
-        // Normal login flow
-        return res.redirect("/");
       });
     })(req, res, next);
   });
